@@ -1,0 +1,27 @@
+[package]
+name = "vapor_keeb"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ch32-hal = { path = "./ch32-hal", features = ["ch32v307vct6", "embassy", "rt", "highcode", "time-driver-tim1"] }
+embassy-executor = { git="https://github.com/embassy-rs/embassy.git", features = [
+    "nightly",
+    "integrated-timers",
+    "arch-riscv32",
+    "executor-thread",
+] }
+
+embassy-time = { git="https://github.com/embassy-rs/embassy.git" }
+nb = "1.1.0"
+
+qingke-rt = "0.2.1"
+qingke = "0.2.0"
+
+panic-halt = "0.2.0"
+embedded-hal-bus = "0.2.0"
+
+[profile.release]
+strip = false   # symbols are not flashed to the microcontroller, so don't strip them.
+lto = true
+opt-level = "z" # Optimize for size.

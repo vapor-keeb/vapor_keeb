@@ -1,0 +1,3 @@
+[submodule "ch32-hal"]
+	path = ch32-hal
+	url = git@github.com:vapor-keeb/ch32-hal.git
