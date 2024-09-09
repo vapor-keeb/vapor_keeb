@@ -558,6 +558,7 @@ name = "vapor_keeb"
 version = "0.1.0"
 dependencies = [
  "ch32-hal",
+ "critical-section",
  "embassy-executor",
  "embassy-time",
  "embedded-hal-bus",
