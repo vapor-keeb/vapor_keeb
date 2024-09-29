@@ -3,12 +3,20 @@
 #![feature(type_alias_impl_trait)]
 #![feature(impl_trait_in_assoc_type)]
 
-use ch32_hal::{pac::{OTG_FS, RCC}, Config};
+use core::{marker::PhantomData, mem::MaybeUninit};
+
+use ch32_hal::{mode::Blocking, pac::{usart::Usart, OTG_FS, RCC}, peripherals::{self, USART1}, usart::{self, UartTx}, Config, Peripheral, RccPeripheral, RemapPeripheral};
+use defmt::println;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use hal::gpio::{AnyPin, Level, Output, Pin};
+use logger::set_logger;
 use qingke::interrupt::Priority;
 use {ch32_hal as hal, panic_halt as _};
+
+mod logger;
+
+static mut uart: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUninit::uninit();
 
 #[embassy_executor::task(pool_size = 3)]
 async fn blink(pin: AnyPin, interval_ms: u64) {
@@ -52,7 +60,19 @@ async fn main(spawner: Spawner) -> ! {
     // GPIO
     spawner.spawn(blink(p.PA15.degrade(), 1000)).unwrap();
     spawner.spawn(blink(p.PB4.degrade(), 500)).unwrap();
+    let cfg = usart::Config::default();
+    unsafe {
+        uart = MaybeUninit::new(UartTx::<'static, _, _>::new_blocking(p.USART1, p.PA9, cfg).unwrap());
+    };
+
+    set_logger(&|data| { unsafe{ uart.assume_init_mut().blocking_write(data);} });
+
+    let mut i = 0usize;
+
     loop {
         Timer::after_millis(2000).await;
+
+        println!("lol {}", i);
+        i = 1 + i;
     }
 }
