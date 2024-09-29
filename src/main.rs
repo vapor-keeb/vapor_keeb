@@ -5,14 +5,20 @@
 
 use core::{marker::PhantomData, mem::MaybeUninit, panic::PanicInfo};
 
-use ch32_hal::{mode::Blocking, pac::{usart::Usart, OTG_FS, RCC}, peripherals::{self, USART1}, usart::{self, UartTx}, Config, Peripheral, RccPeripheral, RemapPeripheral};
+use ch32_hal as hal;
+use ch32_hal::{
+    mode::Blocking,
+    pac::{usart::Usart, OTG_FS, RCC},
+    peripherals::{self, USART1},
+    usart::{self, UartTx},
+    Config, Peripheral, RccPeripheral, RemapPeripheral,
+};
 use defmt::{println, Display2Format};
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use hal::gpio::{AnyPin, Level, Output, Pin};
 use logger::set_logger;
 use qingke::interrupt::Priority;
-use ch32_hal as hal;
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -25,7 +31,7 @@ mod logger;
 
 static mut uart: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUninit::uninit();
 
-#[embassy_executor::task(pool_size = 3)]
+#[embassy_executor::task(pool_size = 2)]
 async fn blink(pin: AnyPin, interval_ms: u64) {
     let mut led = Output::new(pin, Level::Low, Default::default());
 
@@ -46,44 +52,28 @@ async fn main(spawner: Spawner) -> ! {
     };
     let p = hal::init(cfg);
     hal::embassy::init();
-
-    ::critical_section::with(|_| {
-        RCC.ahbpcenr().modify(|w| w.set_otg_en(true));
-        // Enable USBD
-
-        OTG_FS.ctrl().modify(|w| {
-            w.0 = 0;
-            w.set_host_mode(true);
-            w.set_low_speed(false);
-            w.set_dev_pu_en(true);
-            w.set_sys_ctrl(0b11);
-        });
-
-        OTG_FS.int_en().write(|w| w.0 = 0);
+    // Setup the printer
+    let uart1_config = usart::Config::default();
+    unsafe {
+        uart = MaybeUninit::new(
+            UartTx::<'static, _, _>::new_blocking(p.USART1, p.PA9, uart1_config).unwrap(),
+        );
+    };
+    set_logger(&|data| unsafe {
+        #[allow(unused_must_use, static_mut_refs)]
+        uart.assume_init_mut().blocking_write(data);
     });
-
-
 
     // GPIO
     spawner.spawn(blink(p.PA15.degrade(), 1000)).unwrap();
     spawner.spawn(blink(p.PB4.degrade(), 500)).unwrap();
-    let cfg = usart::Config::default();
-    unsafe {
-        uart = MaybeUninit::new(UartTx::<'static, _, _>::new_blocking(p.USART1, p.PA9, cfg).unwrap());
-    };
-
-    set_logger(&|data| { unsafe{ uart.assume_init_mut().blocking_write(data);} });
 
     let mut i = 0usize;
 
     loop {
-        Timer::after_millis(2000).await;
+        Timer::after_millis(1).await;
 
         println!("lol {}", i);
-        i = 1 + i;
-
-        if i == 30 {
-            panic!("yomama is panicking")
-        }
+        i = i.wrapping_add(1);
     }
 }

@@ -3,52 +3,54 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use critical_section::RestoreState;
 use defmt::Encoder;
 
-static mut encoder: Encoder = Encoder::new();
-static logger_acquired: AtomicBool = AtomicBool::new(false);
-static mut restore_state: critical_section::RestoreState = RestoreState::invalid();
+static mut ENCODER: Encoder = Encoder::new();
+static LOGGER_ACQUIRED: AtomicBool = AtomicBool::new(false);
+static mut RESTORE_STATE: critical_section::RestoreState = RestoreState::invalid();
 
-static mut uart_tx: Option<&'static dyn Fn(&[u8]) -> ()> = None;
+static mut WRITER: Option<&'static dyn Fn(&[u8]) -> ()> = None;
 
 pub fn set_logger(write: &'static dyn Fn(&[u8]) -> ()) {
-    unsafe { uart_tx = Some(write) }
+    unsafe { WRITER = Some(write) }
 }
 
 fn uart_tx_write(bytes: &[u8]) {
-    unsafe { uart_tx.map(|write| write(bytes)) };
+    unsafe { WRITER.map(|write| write(bytes)) };
 }
 
 #[defmt::global_logger]
 pub struct Logger;
+
+#[allow(static_mut_refs)]
 unsafe impl defmt::Logger for Logger {
     fn acquire() {
         let cs_handle = unsafe { critical_section::acquire() };
-        let acquired = logger_acquired.load(Ordering::Acquire);
+        let acquired = LOGGER_ACQUIRED.load(Ordering::Acquire);
         if acquired {
             // panic equivalent to avoid nesting
             loop {}
         }
         unsafe {
-            restore_state = cs_handle;
+            RESTORE_STATE = cs_handle;
         }
-        logger_acquired.store(true, Ordering::Release);
-        unsafe { encoder.start_frame(uart_tx_write) };
+        LOGGER_ACQUIRED.store(true, Ordering::Release);
+        unsafe { ENCODER.start_frame(uart_tx_write) };
     }
 
     unsafe fn flush() {
     }
 
     unsafe fn release() {
-        encoder.end_frame(uart_tx_write);
-        let acquired = logger_acquired.load(Ordering::Acquire);
+        ENCODER.end_frame(uart_tx_write);
+        let acquired = LOGGER_ACQUIRED.load(Ordering::Acquire);
         if !acquired {
             // panic equivalent to avoid nesting
             loop {}
         }
-        critical_section::release(restore_state);
-        logger_acquired.store(false, Ordering::Release);
+        critical_section::release(RESTORE_STATE);
+        LOGGER_ACQUIRED.store(false, Ordering::Release);
     }
 
     unsafe fn write(bytes: &[u8]) {
-        encoder.write(bytes, uart_tx_write);
+        ENCODER.write(bytes, uart_tx_write);
     }
 }
