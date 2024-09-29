@@ -5,6 +5,7 @@
 
 use core::{marker::PhantomData, mem::MaybeUninit, panic::PanicInfo};
 
+use ch32_hal::otg_fs::{Driver, EpOutBuffer};
 use ch32_hal as hal;
 use ch32_hal::{
     mode::Blocking,
@@ -15,7 +16,8 @@ use ch32_hal::{
 };
 use defmt::{println, Display2Format};
 use embassy_executor::Spawner;
-use embassy_time::{Duration, Timer};
+use embassy_time::{Duration, Instant, Timer};
+use embassy_usb::Builder;
 use hal::gpio::{AnyPin, Level, Output, Pin};
 use logger::set_logger;
 use qingke::interrupt::Priority;
@@ -31,7 +33,7 @@ mod logger;
 
 static mut uart: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUninit::uninit();
 
-#[embassy_executor::task(pool_size = 2)]
+#[embassy_executor::task(pool_size = 1)]
 async fn blink(pin: AnyPin, interval_ms: u64) {
     let mut led = Output::new(pin, Level::Low, Default::default());
 
@@ -64,16 +66,30 @@ async fn main(spawner: Spawner) -> ! {
         uart.assume_init_mut().blocking_write(data);
     });
 
-    // GPIO
-    spawner.spawn(blink(p.PA15.degrade(), 1000)).unwrap();
     spawner.spawn(blink(p.PB4.degrade(), 500)).unwrap();
 
-    let mut i = 0usize;
 
+    /* USB DRIVER SECION */
+    let mut buffer: [EpOutBuffer; 4] = [EpOutBuffer::default(); 4];
+    let driver = Driver::new(p.OTG_FS, p.PA12, p.PA11, &mut buffer);
+    let config = embassy_usb::Config::new(0xBADF, 0xbeef);
+    let mut config_descriptor = [0; 256];
+    let mut bos_descriptor = [0; 256];
+    let mut control_buf = [0; 7];
+    let mut builder = Builder::new(
+        driver,
+        config,
+        &mut config_descriptor,
+        &mut bos_descriptor,
+        &mut [], // no msos descriptors
+        &mut control_buf,
+    );
+    /* END USB DRIVER */
+
+    let mut next_timeout = Instant::now();
     loop {
-        Timer::after_millis(1).await;
-
-        println!("lol {}", i);
-        i = i.wrapping_add(1);
+        next_timeout += Duration::from_secs(1);
+        println!("Uptime (ms): {}", Instant::now().as_millis());
+        Timer::at(next_timeout).await;
     }
 }
