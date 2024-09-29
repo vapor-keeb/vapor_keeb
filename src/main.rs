@@ -3,16 +3,23 @@
 #![feature(type_alias_impl_trait)]
 #![feature(impl_trait_in_assoc_type)]
 
-use core::{marker::PhantomData, mem::MaybeUninit};
+use core::{marker::PhantomData, mem::MaybeUninit, panic::PanicInfo};
 
 use ch32_hal::{mode::Blocking, pac::{usart::Usart, OTG_FS, RCC}, peripherals::{self, USART1}, usart::{self, UartTx}, Config, Peripheral, RccPeripheral, RemapPeripheral};
-use defmt::println;
+use defmt::{println, Display2Format};
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use hal::gpio::{AnyPin, Level, Output, Pin};
 use logger::set_logger;
 use qingke::interrupt::Priority;
-use {ch32_hal as hal, panic_halt as _};
+use ch32_hal as hal;
+
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    println!("{}", Display2Format(info));
+
+    loop {}
+}
 
 mod logger;
 
@@ -74,5 +81,9 @@ async fn main(spawner: Spawner) -> ! {
 
         println!("lol {}", i);
         i = 1 + i;
+
+        if i == 30 {
+            panic!("yomama is panicking")
+        }
     }
 }

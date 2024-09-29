@@ -1,5 +1,7 @@
 [build]
 target = "riscv32imafc-unknown-none-elf"
+target-dir = "target"
 
 [target.riscv32imafc-unknown-none-elf]
 runner = "probe-rs run --chip CH32V307"
+
