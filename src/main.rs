@@ -14,7 +14,7 @@ use ch32_hal::{
     usart::{self, UartTx},
     Config, Peripheral, RccPeripheral, RemapPeripheral,
 };
-use defmt::{println, Display2Format};
+use defmt::{info, println, Display2Format};
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Instant, Timer};
 use embassy_usb::Builder;
@@ -67,6 +67,8 @@ async fn main(spawner: Spawner) -> ! {
     });
 
     spawner.spawn(blink(p.PB4.degrade(), 500)).unwrap();
+    Timer::after_millis(300).await;
+    info!("Starting USB");
 
 
     /* USB DRIVER SECION */
@@ -84,6 +86,8 @@ async fn main(spawner: Spawner) -> ! {
         &mut [], // no msos descriptors
         &mut control_buf,
     );
+    let mut usb_device = builder.build();
+    usb_device.run_until_suspend().await;
     /* END USB DRIVER */
 
     let mut next_timeout = Instant::now();
