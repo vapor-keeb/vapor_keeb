@@ -285,6 +285,7 @@ name = "embassy-usb"
 version = "0.3.0"
 source = "git+https://github.com/embassy-rs/embassy.git#a7d1abf6b79d25632a1966ed9f27fa21ab3e0e47"
 dependencies = [
+ "defmt",
  "embassy-futures 0.1.1 (git+https://github.com/embassy-rs/embassy.git)",
  "embassy-net-driver-channel",
  "embassy-sync 0.6.0 (git+https://github.com/embassy-rs/embassy.git)",
@@ -298,6 +299,9 @@ dependencies = [
 name = "embassy-usb-driver"
 version = "0.1.0"
 source = "git+https://github.com/embassy-rs/embassy.git#a7d1abf6b79d25632a1966ed9f27fa21ab3e0e47"
+dependencies = [
+ "defmt",
+]
 
 [[package]]
 name = "embedded-hal"

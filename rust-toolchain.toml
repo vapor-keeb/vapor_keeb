@@ -3,4 +3,5 @@ channel = "nightly"
 components = [ "rust-src", "rustfmt", "llvm-tools", "miri", "rust-analyzer", "clippy" ]
 targets = [
     "riscv32imafc-unknown-none-elf",
+    "riscv32imac-unknown-none-elf",
 ]

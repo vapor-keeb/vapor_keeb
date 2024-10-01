@@ -5,11 +5,11 @@
 
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
-use ch32_hal::otg_fs::{self, Driver, EpOutBuffer};
-use ch32_hal::{self as hal, bind_interrupts};
+use ch32_hal::otg_fs::{Driver, EpOutBuffer};
+use ch32_hal::{self as hal};
 use ch32_hal::{
     mode::Blocking,
-    peripherals::{self, USART1},
+    peripherals::USART1,
     usart::{self, UartTx},
     Config,
 };
@@ -20,9 +20,6 @@ use embassy_usb::Builder;
 use hal::gpio::{AnyPin, Level, Output, Pin};
 use logger::set_logger;
 
-bind_interrupts!(struct Irqs {
-    OTG_FS => otg_fs::InterruptHandler<peripherals::OTG_FS>;
-});
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -48,6 +45,7 @@ async fn blink(pin: AnyPin, interval_ms: u64) {
 
 #[embassy_executor::main(entry = "qingke_rt::entry")]
 async fn main(spawner: Spawner) -> ! {
+
     // setup clocks
     let cfg = Config {
         rcc: ch32_hal::rcc::Config::SYSCLK_FREQ_144MHZ_HSE,
@@ -68,13 +66,13 @@ async fn main(spawner: Spawner) -> ! {
         uart.assume_init_mut().blocking_write(data);
     });
 
-    spawner.spawn(blink(p.PB4.degrade(), 1000)).unwrap();
+    spawner.spawn(blink(p.PB4.degrade(), 100)).unwrap();
     Timer::after_millis(300).await;
     info!("Starting USB");
 
     /* USB DRIVER SECION */
     let mut buffer: [EpOutBuffer; 4] = [EpOutBuffer::default(); 4];
-    let driver = Driver::new(p.OTG_FS, Irqs, p.PA12, p.PA11, &mut buffer);
+    let driver = Driver::new(p.OTG_FS, p.PA12, p.PA11, &mut buffer);
     let config = embassy_usb::Config::new(0xBADF, 0xbeef);
     let mut config_descriptor = [0; 256];
     let mut bos_descriptor = [0; 256];
