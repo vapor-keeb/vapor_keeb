@@ -5,7 +5,7 @@
 
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
-use ch32_hal::otg_fs::{Driver, EpOutBuffer};
+use ch32_hal::otg_fs::{Driver, EndpointDataBuffer};
 use ch32_hal::{self as hal};
 use ch32_hal::{
     mode::Blocking,
@@ -25,8 +25,6 @@ fn panic(info: &PanicInfo) -> ! {
     critical_section::with(|_| {
         println!("{}", Display2Format(info));
 
-        // Somehow??? Maybe I'm insane
-        qingke::riscv::interrupt::disable();
         loop {}
     })
 }
@@ -55,6 +53,13 @@ async fn main(spawner: Spawner) -> ! {
     let p = hal::init(cfg);
     hal::embassy::init();
 
+    spawner.spawn(blink(p.PB4.degrade(), 100)).unwrap();
+    Timer::after_millis(3000).await;
+    loop {
+        Timer::after_secs(1).await;
+    }
+
+    
     // Setup the printer
     let uart1_config = usart::Config::default();
     unsafe {
@@ -67,12 +72,10 @@ async fn main(spawner: Spawner) -> ! {
         uart.assume_init_mut().blocking_write(data);
     });
 
-    spawner.spawn(blink(p.PB4.degrade(), 100)).unwrap();
-    Timer::after_millis(300).await;
     info!("Starting USB");
 
     /* USB DRIVER SECION */
-    let mut buffer: [EpOutBuffer; 4] = [EpOutBuffer::default(); 4];
+    let mut buffer: [EndpointDataBuffer; 4] = [EndpointDataBuffer::default(); 4];
     let driver = Driver::new(p.OTG_FS, p.PA12, p.PA11, &mut buffer);
     let config = embassy_usb::Config::new(0xBADF, 0xbeef);
     let mut config_descriptor = [0; 256];

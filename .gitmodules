@@ -1,3 +1,6 @@
 [submodule "ch32-hal"]
 	path = ch32-hal
 	url = git@github.com:vapor-keeb/ch32-hal.git
+[submodule "qingke"]
+	path = qingke
+	url = git@github.com:vapor-keeb/qingke.git

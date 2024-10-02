@@ -79,7 +79,7 @@ dependencies = [
 [[package]]
 name = "ch32-metapac"
 version = "0.1.0"
-source = "git+https://github.com/vapor-keeb/ch32-metapac.git?branch=main#763bb24605730e8beb3bbdb741aab05268afd236"
+source = "git+https://github.com/vapor-keeb/ch32-metapac.git?branch=main#eabd99973823dd849ff6b8881fd4e678f53ee628"
 dependencies = [
  "riscv",
  "vcell",
@@ -170,7 +170,7 @@ dependencies = [
 [[package]]
 name = "embassy-executor"
 version = "0.6.0"
-source = "git+https://github.com/embassy-rs/embassy.git#a7d1abf6b79d25632a1966ed9f27fa21ab3e0e47"
+source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
 dependencies = [
  "critical-section",
  "document-features",
@@ -182,7 +182,7 @@ dependencies = [
 [[package]]
 name = "embassy-executor-macros"
 version = "0.5.0"
-source = "git+https://github.com/embassy-rs/embassy.git#a7d1abf6b79d25632a1966ed9f27fa21ab3e0e47"
+source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -199,7 +199,7 @@ checksum = "1f878075b9794c1e4ac788c95b728f26aa6366d32eeb10c7051389f898f7d067"
 [[package]]
 name = "embassy-futures"
 version = "0.1.1"
-source = "git+https://github.com/embassy-rs/embassy.git#a7d1abf6b79d25632a1966ed9f27fa21ab3e0e47"
+source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
 
 [[package]]
 name = "embassy-hal-internal"
@@ -213,12 +213,12 @@ dependencies = [
 [[package]]
 name = "embassy-net-driver"
 version = "0.2.0"
-source = "git+https://github.com/embassy-rs/embassy.git#a7d1abf6b79d25632a1966ed9f27fa21ab3e0e47"
+source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
 
 [[package]]
 name = "embassy-net-driver-channel"
 version = "0.3.0"
-source = "git+https://github.com/embassy-rs/embassy.git#a7d1abf6b79d25632a1966ed9f27fa21ab3e0e47"
+source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
 dependencies = [
  "embassy-futures 0.1.1 (git+https://github.com/embassy-rs/embassy.git)",
  "embassy-net-driver",
@@ -241,7 +241,7 @@ dependencies = [
 [[package]]
 name = "embassy-sync"
 version = "0.6.0"
-source = "git+https://github.com/embassy-rs/embassy.git#a7d1abf6b79d25632a1966ed9f27fa21ab3e0e47"
+source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
 dependencies = [
  "cfg-if",
  "critical-section",
@@ -253,7 +253,7 @@ dependencies = [
 [[package]]
 name = "embassy-time"
 version = "0.3.2"
-source = "git+https://github.com/embassy-rs/embassy.git#a7d1abf6b79d25632a1966ed9f27fa21ab3e0e47"
+source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
 dependencies = [
  "cfg-if",
  "critical-section",
@@ -270,7 +270,7 @@ dependencies = [
 [[package]]
 name = "embassy-time-driver"
 version = "0.1.0"
-source = "git+https://github.com/embassy-rs/embassy.git#a7d1abf6b79d25632a1966ed9f27fa21ab3e0e47"
+source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
 dependencies = [
  "document-features",
 ]
@@ -278,12 +278,12 @@ dependencies = [
 [[package]]
 name = "embassy-time-queue-driver"
 version = "0.1.0"
-source = "git+https://github.com/embassy-rs/embassy.git#a7d1abf6b79d25632a1966ed9f27fa21ab3e0e47"
+source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
 
 [[package]]
 name = "embassy-usb"
 version = "0.3.0"
-source = "git+https://github.com/embassy-rs/embassy.git#a7d1abf6b79d25632a1966ed9f27fa21ab3e0e47"
+source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
 dependencies = [
  "defmt",
  "embassy-futures 0.1.1 (git+https://github.com/embassy-rs/embassy.git)",
@@ -298,7 +298,7 @@ dependencies = [
 [[package]]
 name = "embassy-usb-driver"
 version = "0.1.0"
-source = "git+https://github.com/embassy-rs/embassy.git#a7d1abf6b79d25632a1966ed9f27fa21ab3e0e47"
+source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
 dependencies = [
  "defmt",
 ]
@@ -588,8 +588,6 @@ dependencies = [
 [[package]]
 name = "qingke"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42a9bbdb31ef9edd7d73dcc21b98945d032d2d18423b62ef0565539957a127f1"
 dependencies = [
  "bit_field",
  "critical-section",
