@@ -2,13 +2,27 @@
 
 set -eux
 
-USB=${1:-/dev/ttyUSB0}
+OS=$(uname)
+UART=${1:-/dev/ttyUSB0}
 export DEFMT_LOG=${DEFMT_LOG:-trace}
 LOG_FORMAT=${LOG_FORMAT:-'[{L}]{f:>10}:{l:<4}: {s}'}
+LOG_FILE="usb.log"
+
+OBJDUMP=riscv32-elf-objdump
+
+if [ ! -x $OBJDUMP ]; then
+OBJDUMP=riscv64-elf-objdump
+fi
 
 EXE=vapor_keeb
 OUT_DIR=target/riscv32imac-unknown-none-elf/release
 
-cargo flash --release --chip CH32V307
-riscv32-elf-objdump -dC $OUT_DIR/$EXE > $OUT_DIR/$EXE.objdump || echo 'riscv32-elf-objdump not found, skipping OBJDUMP'
-socat $USB,rawer,b115200 STDOUT | defmt-print --verbose -e $OUT_DIR/$EXE --log-format "$LOG_FORMAT" | tee usb.log
+cargo build --release
+$OBJDUMP -dC $OUT_DIR/$EXE > $OUT_DIR/$EXE.objdump || echo 'riscv32-elf-objdump not found, skipping OBJDUMP'
+probe-rs download --chip CH32V307 $OUT_DIR/$EXE
+probe-rs reset --chip CH32V307
+if [[ "$OS" = "Darwin" ]] ; then
+(stty speed 115200 >/dev/null && cat) <$UART | defmt-print --verbose -e $OUT_DIR/$EXE --log-format "$LOG_FORMAT" | tee $LOG_FILE
+else
+socat $UART,rawer,b115200 STDOUT | defmt-print --verbose -e $OUT_DIR/$EXE --log-format "$LOG_FORMAT" | tee $LOG_FILE
+fi

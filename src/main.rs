@@ -53,13 +53,7 @@ async fn main(spawner: Spawner) -> ! {
     let p = hal::init(cfg);
     hal::embassy::init();
 
-    spawner.spawn(blink(p.PB4.degrade(), 100)).unwrap();
-    Timer::after_millis(3000).await;
-    loop {
-        Timer::after_secs(1).await;
-    }
 
-    
     // Setup the printer
     let uart1_config = usart::Config::default();
     unsafe {
@@ -72,6 +66,8 @@ async fn main(spawner: Spawner) -> ! {
         uart.assume_init_mut().blocking_write(data);
     });
 
+    spawner.spawn(blink(p.PB4.degrade(), 100)).unwrap();
+    Timer::after_millis(300).await;
     info!("Starting USB");
 
     /* USB DRIVER SECION */
@@ -90,15 +86,11 @@ async fn main(spawner: Spawner) -> ! {
         &mut control_buf,
     );
     let mut usb_device = builder.build();
-    usb_device.run().await;
+    loop {
+        usb_device.run_until_suspend().await;
+        println!("USB Suspended at: {}ms", Instant::now().as_millis());
+        Timer::after_millis(100).await;
+    }
     /* END USB DRIVER */
 
-    /*
-    let mut next_timeout = Instant::now();
-    loop {
-        next_timeout += Duration::from_secs(1);
-        println!("Uptime (ms): {}", Instant::now().as_millis());
-        Timer::at(next_timeout).await;
-    }
-    */
 }

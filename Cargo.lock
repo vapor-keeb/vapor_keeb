@@ -587,7 +587,7 @@ dependencies = [
 
 [[package]]
 name = "qingke"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bit_field",
  "critical-section",
@@ -596,9 +596,7 @@ dependencies = [
 
 [[package]]
 name = "qingke-rt"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b175d27f60c4bc2d779158c2bf0746b4b2f4597732083befbd64b0cc7ab7b608"
+version = "0.3.0"
 dependencies = [
  "qingke",
  "qingke-rt-macros",
@@ -606,9 +604,7 @@ dependencies = [
 
 [[package]]
 name = "qingke-rt-macros"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c54802ab7754743f6948ccb40547ae0fad2243ff5095b2851c59c4f6bdf65d7b"
+version = "0.3.0"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
