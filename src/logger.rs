@@ -46,8 +46,8 @@ unsafe impl defmt::Logger for Logger {
             // panic equivalent to avoid nesting
             loop {}
         }
-        critical_section::release(RESTORE_STATE);
         LOGGER_ACQUIRED.store(false, Ordering::Release);
+        critical_section::release(RESTORE_STATE);
     }
 
     unsafe fn write(bytes: &[u8]) {
