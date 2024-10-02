@@ -20,13 +20,15 @@ use embassy_usb::Builder;
 use hal::gpio::{AnyPin, Level, Output, Pin};
 use logger::set_logger;
 
-
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    println!("{}", Display2Format(info));
+    critical_section::with(|_| {
+        println!("{}", Display2Format(info));
 
-    let _ = unsafe { critical_section::acquire() };
-    loop {}
+        // Somehow??? Maybe I'm insane
+        qingke::riscv::interrupt::disable();
+        loop {}
+    })
 }
 
 mod logger;
@@ -45,7 +47,6 @@ async fn blink(pin: AnyPin, interval_ms: u64) {
 
 #[embassy_executor::main(entry = "qingke_rt::entry")]
 async fn main(spawner: Spawner) -> ! {
-
     // setup clocks
     let cfg = Config {
         rcc: ch32_hal::rcc::Config::SYSCLK_FREQ_144MHZ_HSE,
@@ -86,13 +87,15 @@ async fn main(spawner: Spawner) -> ! {
         &mut control_buf,
     );
     let mut usb_device = builder.build();
-    usb_device.run_until_suspend().await;
+    usb_device.run().await;
     /* END USB DRIVER */
 
+    /*
     let mut next_timeout = Instant::now();
     loop {
         next_timeout += Duration::from_secs(1);
         println!("Uptime (ms): {}", Instant::now().as_millis());
         Timer::at(next_timeout).await;
     }
+    */
 }
