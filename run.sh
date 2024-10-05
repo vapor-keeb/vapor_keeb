@@ -25,8 +25,4 @@ probe-rs download --chip CH32V307 $OUT_DIR/$EXE
 probe-rs reset --chip CH32V307
 fi
 
-if [[ "$OS" = "Darwin" ]] ; then
-(stty speed 115200 >/dev/null && cat) <$UART | defmt-print --verbose -e $OUT_DIR/$EXE --log-format "$LOG_FORMAT" | tee $LOG_FILE
-else
-socat $UART,rawer,b115200 STDOUT | defmt-print --verbose -e $OUT_DIR/$EXE --log-format "$LOG_FORMAT" | tee $LOG_FILE
-fi
+serial-cat $UART | defmt-print --verbose -e $OUT_DIR/$EXE --log-format "$LOG_FORMAT" | tee $LOG_FILE
