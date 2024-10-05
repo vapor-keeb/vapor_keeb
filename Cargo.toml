@@ -19,6 +19,7 @@ embassy-executor = { git = "https://github.com/embassy-rs/embassy.git", features
     "arch-riscv32",
     "executor-thread",
 ] }
+embassy-futures = { git = "https://github.com/embassy-rs/embassy.git" }
 
 critical-section = { version = "1.1.3" }
 embassy-time = { git = "https://github.com/embassy-rs/embassy.git" }
