@@ -79,7 +79,7 @@ async fn main(spawner: Spawner) -> ! {
     info!("Starting USB");
 
     /* USB DRIVER SECION */
-    let mut buffer: [EndpointDataBuffer; 4] = [EndpointDataBuffer::default(); 4];
+    let mut buffer: [EndpointDataBuffer; 4] = core::array::from_fn(|_| EndpointDataBuffer::default());
     let driver = Driver::new(p.OTG_FS, p.PA12, p.PA11, &mut buffer);
     let mut config = embassy_usb::Config::new(0xc0de, 0xcafe);
     config.manufacturer = Some("Embassy");

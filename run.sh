@@ -10,7 +10,7 @@ LOG_FILE="usb.log"
 
 OBJDUMP=riscv32-elf-objdump
 
-if [ ! -x `which $OBJDUMP` ]; then
+if [[ ! -x $(which $OBJDUMP) ]]; then
 echo 'using rv64 objdump'
 OBJDUMP=riscv64-elf-objdump
 fi

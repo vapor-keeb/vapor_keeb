@@ -57,9 +57,9 @@ dependencies = [
  "ch32-metapac",
  "critical-section",
  "defmt",
- "embassy-futures 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "embassy-futures",
  "embassy-hal-internal",
- "embassy-sync 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "embassy-sync",
  "embassy-time",
  "embassy-time-driver",
  "embassy-usb-driver",
@@ -170,7 +170,6 @@ dependencies = [
 [[package]]
 name = "embassy-executor"
 version = "0.6.0"
-source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
 dependencies = [
  "critical-section",
  "document-features",
@@ -182,7 +181,6 @@ dependencies = [
 [[package]]
 name = "embassy-executor-macros"
 version = "0.5.0"
-source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -197,11 +195,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f878075b9794c1e4ac788c95b728f26aa6366d32eeb10c7051389f898f7d067"
 
 [[package]]
-name = "embassy-futures"
-version = "0.1.1"
-source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
-
-[[package]]
 name = "embassy-hal-internal"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -213,16 +206,18 @@ dependencies = [
 [[package]]
 name = "embassy-net-driver"
 version = "0.2.0"
-source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "524eb3c489760508f71360112bca70f6e53173e6fe48fc5f0efd0f5ab217751d"
 
 [[package]]
 name = "embassy-net-driver-channel"
 version = "0.3.0"
-source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4818c32afec43e3cae234f324bad9a976c9aa7501022d26ff60a4017a1a006b7"
 dependencies = [
- "embassy-futures 0.1.1 (git+https://github.com/embassy-rs/embassy.git)",
+ "embassy-futures",
  "embassy-net-driver",
- "embassy-sync 0.6.0 (git+https://github.com/embassy-rs/embassy.git)",
+ "embassy-sync",
 ]
 
 [[package]]
@@ -239,21 +234,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "embassy-sync"
-version = "0.6.0"
-source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
-dependencies = [
- "cfg-if",
- "critical-section",
- "embedded-io-async",
- "futures-util",
- "heapless",
-]
-
-[[package]]
 name = "embassy-time"
 version = "0.3.2"
-source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
 dependencies = [
  "cfg-if",
  "critical-section",
@@ -270,7 +252,6 @@ dependencies = [
 [[package]]
 name = "embassy-time-driver"
 version = "0.1.0"
-source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
 dependencies = [
  "document-features",
 ]
@@ -278,17 +259,17 @@ dependencies = [
 [[package]]
 name = "embassy-time-queue-driver"
 version = "0.1.0"
-source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
 
 [[package]]
 name = "embassy-usb"
 version = "0.3.0"
-source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d0b882133fa684b9d4652351cd7aac5afe8a2c2bf4a7da59f442ff61087cda2"
 dependencies = [
  "defmt",
- "embassy-futures 0.1.1 (git+https://github.com/embassy-rs/embassy.git)",
+ "embassy-futures",
  "embassy-net-driver-channel",
- "embassy-sync 0.6.0 (git+https://github.com/embassy-rs/embassy.git)",
+ "embassy-sync",
  "embassy-usb-driver",
  "heapless",
  "ssmarshal",
@@ -298,7 +279,8 @@ dependencies = [
 [[package]]
 name = "embassy-usb-driver"
 version = "0.1.0"
-source = "git+https://github.com/embassy-rs/embassy.git#bc0180800d751e651c0d15c807285c11cdb4f486"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fc247028eae04174b6635104a35b1ed336aabef4654f5e87a8f32327d231970"
 dependencies = [
  "defmt",
 ]
@@ -788,7 +770,7 @@ dependencies = [
  "critical-section",
  "defmt",
  "embassy-executor",
- "embassy-futures 0.1.1 (git+https://github.com/embassy-rs/embassy.git)",
+ "embassy-futures",
  "embassy-time",
  "embassy-usb",
  "embassy-usb-driver",
