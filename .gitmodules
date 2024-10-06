@@ -4,3 +4,6 @@
 [submodule "qingke"]
 	path = qingke
 	url = git@github.com:vapor-keeb/qingke.git
+[submodule "embassy"]
+	path = embassy
+	url = git@github.com:vapor-keeb/embassy.git

@@ -61,7 +61,6 @@ async fn main(spawner: Spawner) -> ! {
     let p = hal::init(cfg);
     hal::embassy::init();
 
-
     // Setup the printer
     let uart1_config = usart::Config::default();
     unsafe {
@@ -79,7 +78,8 @@ async fn main(spawner: Spawner) -> ! {
     info!("Starting USB");
 
     /* USB DRIVER SECION */
-    let mut buffer: [EndpointDataBuffer; 4] = core::array::from_fn(|_| EndpointDataBuffer::default());
+    let mut buffer: [EndpointDataBuffer; 4] =
+        core::array::from_fn(|_| EndpointDataBuffer::default());
     let driver = Driver::new(p.OTG_FS, p.PA12, p.PA11, &mut buffer);
     let mut config = embassy_usb::Config::new(0xc0de, 0xcafe);
     config.manufacturer = Some("Embassy");
@@ -113,15 +113,12 @@ async fn main(spawner: Spawner) -> ! {
         &mut control_buf,
     );
 
-
-
     builder.msos_descriptor(windows_version::WIN8_1, 0);
     builder.msos_feature(msos::CompatibleIdFeatureDescriptor::new("WINUSB", ""));
     builder.msos_feature(msos::RegistryPropertyFeatureDescriptor::new(
         "DeviceInterfaceGUIDs",
         msos::PropertyData::RegMultiSz(DEVICE_INTERFACE_GUIDS),
     ));
-
 
     // Add a vendor-specific function (class 0xFF), and corresponding interface,
     // that uses our custom handler.

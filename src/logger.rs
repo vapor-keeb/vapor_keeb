@@ -36,8 +36,7 @@ unsafe impl defmt::Logger for Logger {
         unsafe { ENCODER.start_frame(uart_tx_write) };
     }
 
-    unsafe fn flush() {
-    }
+    unsafe fn flush() {}
 
     unsafe fn release() {
         ENCODER.end_frame(uart_tx_write);
