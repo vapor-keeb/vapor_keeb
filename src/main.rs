@@ -85,19 +85,30 @@ async fn main(spawner: Spawner) -> ! {
     Timer::after_millis(300).await;
 
     // Setup I2C
-    let i2c_sda = p.PB11;
-    let i2c_scl = p.PB10;
+    // let i2c_sda = p.PB11;
+    // let i2c_scl = p.PB10;
 
-    let mut i2c = I2c::new_blocking(p.I2C2, i2c_scl, i2c_sda, Hertz::khz(10), Default::default());
+    // let mut i2c = I2c::new_blocking(p.I2C2, i2c_scl, i2c_sda, Hertz::khz(10), Default::default());
 
-    info!("94");
-    let mut buf = [0u8; 1];
-    i2c.blocking_write(0x62, &[0x1]).unwrap();
-    // i2c.blocking_write_read(0x1, &[0x62], &mut buf).unwrap();
+    // let i2c_sda = p.PB9;
+    // let i2c_scl = p.PB8;
 
-    println!("Part ID: 0x{:02X}", buf[0]);
+    // let mut i2c = I2c::new_blocking(p.I2C1, i2c_scl, i2c_sda, Hertz::khz(10), Default::default());
+
+    // info!("94");
+    // let mut buf = [0u8; 1];
+    // // i2c.blocking_write(0x31, &[0x5, 0b00100011]).unwrap();
+    // i2c.blocking_write_read(0x31, &[0x5], &mut buf).unwrap();
+    // println!("0x31 0x5 reg: {:#b}", buf[0]);
+
+    // // i2c.blocking_write(0x21, &[0x5, 0b00100011]).unwrap();
+    // i2c.blocking_write_read(0x21, &[0x5], &mut buf).unwrap();
+
+    // println!("0x21 0x5 reg: {:#b}", buf[0]);
 
     info!("Starting USB");
+
+    // loop{}
 
     /* USB DRIVER SECION */
     let mut buffer: [EndpointDataBuffer; 4] =

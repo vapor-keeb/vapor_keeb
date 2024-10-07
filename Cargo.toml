@@ -17,9 +17,8 @@ ch32-hal = { path = "./ch32-hal", features = [
 embassy-executor = { version = "0.6.0", features = [
     "nightly",
     "integrated-timers",
-    "arch-riscv32",
+    "arch-spin",
     "executor-thread",
-    "quirk-no-wfi",
 ] }
 embassy-futures = "0.1.1"
 
