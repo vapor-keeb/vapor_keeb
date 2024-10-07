@@ -2,11 +2,14 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 #![feature(impl_trait_in_assoc_type)]
+#![feature(naked_functions)]
 
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
+use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::{self, Driver, EndpointDataBuffer};
-use ch32_hal::{self as hal};
+use ch32_hal::time::Hertz;
+use ch32_hal::{self as hal, bind_interrupts, peripherals};
 use ch32_hal::{
     mode::Blocking,
     peripherals::USART1,
@@ -25,6 +28,10 @@ use embassy_usb::{Builder, Handler};
 use embassy_usb_driver::EndpointError;
 use hal::gpio::{AnyPin, Level, Output, Pin};
 use logger::set_logger;
+
+bind_interrupts!(struct Irq {
+    OTG_FS => otg_fs::InterruptHandler<peripherals::OTG_FS>;
+});
 
 const DEVICE_INTERFACE_GUIDS: &[&str] = &["{DAC2087C-63FA-458D-A55D-827C0762DEC7}"];
 
@@ -55,7 +62,7 @@ async fn blink(pin: AnyPin, interval_ms: u64) {
 async fn main(spawner: Spawner) -> ! {
     // setup clocks
     let cfg = Config {
-        rcc: ch32_hal::rcc::Config::SYSCLK_FREQ_144MHZ_HSE,
+        rcc: ch32_hal::rcc::Config::SYSCLK_FREQ_144MHZ_HSI,
         ..Default::default()
     };
     let p = hal::init(cfg);
@@ -74,7 +81,22 @@ async fn main(spawner: Spawner) -> ! {
     });
 
     spawner.spawn(blink(p.PB4.degrade(), 100)).unwrap();
+    // wait for serial-cat
     Timer::after_millis(300).await;
+
+    // Setup I2C
+    let i2c_sda = p.PB11;
+    let i2c_scl = p.PB10;
+
+    let mut i2c = I2c::new_blocking(p.I2C2, i2c_scl, i2c_sda, Hertz::khz(10), Default::default());
+
+    info!("94");
+    let mut buf = [0u8; 1];
+    i2c.blocking_write(0x62, &[0x1]).unwrap();
+    // i2c.blocking_write_read(0x1, &[0x62], &mut buf).unwrap();
+
+    println!("Part ID: 0x{:02X}", buf[0]);
+
     info!("Starting USB");
 
     /* USB DRIVER SECION */

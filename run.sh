@@ -21,8 +21,9 @@ OUT_DIR=target/riscv32imac-unknown-none-elf/release
 if [ "${CAT:-}" == "" ] ; then
 cargo build --release
 $OBJDUMP -dC $OUT_DIR/$EXE > $OUT_DIR/$EXE.objdump || echo "$OBJDUMP not found, skipping OBJDUMP"
-probe-rs download --chip CH32V307 $OUT_DIR/$EXE
-probe-rs reset --chip CH32V307
+# probe-rs download --chip CH32V307 $OUT_DIR/$EXE
+# probe-rs reset --chip CH32V307
+wlink flash $OUT_DIR/$EXE
 fi
 
 serial-cat $UART | defmt-print --verbose -e $OUT_DIR/$EXE --log-format "$LOG_FORMAT" | tee $LOG_FILE

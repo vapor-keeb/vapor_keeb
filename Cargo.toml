@@ -6,7 +6,8 @@ edition = "2021"
 [dependencies]
 ch32-hal = { path = "./ch32-hal", features = [
     "defmt",
-    "ch32v307vct6",
+    # "ch32v307vct6",
+    "ch32v305rbt6",
     "embassy",
     "rt",
     # "highcode",
