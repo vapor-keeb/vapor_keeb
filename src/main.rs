@@ -6,8 +6,11 @@
 
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
+use ch32_hal::exti::ExtiInput;
+use ch32_hal::gpio::Pull;
 use ch32_hal::i2c::I2c;
-use ch32_hal::otg_fs::{self, Driver, EndpointDataBuffer};
+use ch32_hal::otg_fs::endpoint::EndpointDataBuffer;
+use ch32_hal::otg_fs::{self, Driver};
 use ch32_hal::time::Hertz;
 use ch32_hal::{self as hal, bind_interrupts, peripherals};
 use ch32_hal::{
@@ -16,11 +19,11 @@ use ch32_hal::{
     usart::{self, UartTx},
     Config,
 };
-use defmt::{info, println, Display2Format};
+use defmt::{info, println, warn, Display2Format};
 use embassy_executor::Spawner;
 use embassy_futures::join::join;
 use embassy_time::{Duration, Instant, Timer};
-use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
+use embassy_usb::class::hid::{HidReaderWriter, ReportId, RequestHandler, State};
 use embassy_usb::control::{InResponse, OutResponse, Recipient, Request, RequestType};
 use embassy_usb::msos::{self, windows_version};
 use embassy_usb::types::InterfaceNumber;
@@ -28,6 +31,7 @@ use embassy_usb::{Builder, Handler};
 use embassy_usb_driver::EndpointError;
 use hal::gpio::{AnyPin, Level, Output, Pin};
 use logger::set_logger;
+use usbd_hid::descriptor::{KeyboardReport, SerializedDescriptor};
 
 bind_interrupts!(struct Irq {
     OTG_FS => otg_fs::InterruptHandler<peripherals::OTG_FS>;
@@ -85,10 +89,10 @@ async fn main(spawner: Spawner) -> ! {
     Timer::after_millis(300).await;
 
     // Setup I2C
-    // let i2c_sda = p.PB11;
-    // let i2c_scl = p.PB10;
+    let i2c_sda = p.PB11;
+    let i2c_scl = p.PB10;
 
-    // let mut i2c = I2c::new_blocking(p.I2C2, i2c_scl, i2c_sda, Hertz::khz(10), Default::default());
+    let mut i2c = I2c::new_blocking(p.I2C2, i2c_scl, i2c_sda, Hertz::khz(10), Default::default());
 
     // let i2c_sda = p.PB9;
     // let i2c_scl = p.PB8;
@@ -96,15 +100,15 @@ async fn main(spawner: Spawner) -> ! {
     // let mut i2c = I2c::new_blocking(p.I2C1, i2c_scl, i2c_sda, Hertz::khz(10), Default::default());
 
     // info!("94");
-    // let mut buf = [0u8; 1];
-    // // i2c.blocking_write(0x31, &[0x5, 0b00100011]).unwrap();
-    // i2c.blocking_write_read(0x31, &[0x5], &mut buf).unwrap();
-    // println!("0x31 0x5 reg: {:#b}", buf[0]);
+    let mut buf = [0u8; 1];
+    i2c.blocking_write(0x31, &[0x5, 0b00101011]).unwrap();
+    i2c.blocking_write_read(0x31, &[0x5], &mut buf).unwrap();
+    println!("0x31 0x5 reg: {:#b}", buf[0]);
 
-    // // i2c.blocking_write(0x21, &[0x5, 0b00100011]).unwrap();
-    // i2c.blocking_write_read(0x21, &[0x5], &mut buf).unwrap();
+    i2c.blocking_write(0x21, &[0x5, 0b00101011]).unwrap();
+    i2c.blocking_write_read(0x21, &[0x5], &mut buf).unwrap();
 
-    // println!("0x21 0x5 reg: {:#b}", buf[0]);
+    println!("0x21 0x5 reg: {:#b}", buf[0]);
 
     info!("Starting USB");
 
@@ -114,10 +118,14 @@ async fn main(spawner: Spawner) -> ! {
     let mut buffer: [EndpointDataBuffer; 4] =
         core::array::from_fn(|_| EndpointDataBuffer::default());
     let driver = Driver::new(p.OTG_FS, p.PA12, p.PA11, &mut buffer);
+
+    // Create embassy-usb Config
     let mut config = embassy_usb::Config::new(0xc0de, 0xcafe);
     config.manufacturer = Some("Embassy");
-    config.product = Some("USB-raw");
+    config.product = Some("HID keyboard example");
     config.serial_number = Some("12345678");
+    config.max_power = 100;
+    config.max_packet_size_0 = 64;
 
     // Required for windows compatibility.
     // https://developer.nordicsemi.com/nRF_Connect_SDK/doc/1.9.1/kconfig/CONFIG_CDC_ACM_IAD.html#help
@@ -130,12 +138,13 @@ async fn main(spawner: Spawner) -> ! {
     // It needs some buffers for building the descriptors.
     let mut config_descriptor = [0; 256];
     let mut bos_descriptor = [0; 256];
+    // You can also add a Microsoft OS descriptor.
     let mut msos_descriptor = [0; 256];
     let mut control_buf = [0; 64];
 
-    let mut handler = ControlHandler {
-        if_num: InterfaceNumber(0),
-    };
+    let mut request_handler = MyRequestHandler {};
+
+    let mut state = State::new();
 
     let mut builder = Builder::new(
         driver,
@@ -146,43 +155,68 @@ async fn main(spawner: Spawner) -> ! {
         &mut control_buf,
     );
 
-    builder.msos_descriptor(windows_version::WIN8_1, 0);
-    builder.msos_feature(msos::CompatibleIdFeatureDescriptor::new("WINUSB", ""));
-    builder.msos_feature(msos::RegistryPropertyFeatureDescriptor::new(
-        "DeviceInterfaceGUIDs",
-        msos::PropertyData::RegMultiSz(DEVICE_INTERFACE_GUIDS),
-    ));
+    // Create classes on the builder.
+    let config = embassy_usb::class::hid::Config {
+        report_descriptor: KeyboardReport::desc(),
+        request_handler: None,
+        poll_ms: 60,
+        max_packet_size: 8,
+    };
 
-    // Add a vendor-specific function (class 0xFF), and corresponding interface,
-    // that uses our custom handler.
-    let mut function = builder.function(0xFF, 0, 0);
-    let mut interface = function.interface();
-    let _alternate = interface.alt_setting(0xFF, 0, 0, None);
-    handler.if_num = interface.interface_number();
-    drop(function);
-    builder.handler(&mut handler);
+    let hid = HidReaderWriter::<_, 1, 8>::new(&mut builder, &mut state, config);
 
     // Build the builder.
     let mut usb = builder.build();
 
     // Run the USB device.
-    // usb.run().await;
+    let usb_fut = usb.run();
 
-    // let mut builder = Builder::new(
-    //     driver,
-    //     config,
-    //     &mut config_descriptor,
-    //     &mut bos_descriptor,
-    //     &mut [], // no msos descriptors
-    //     &mut control_buf,
-    // );
-    // let mut usb_device = builder.build();
-    loop {
-        usb.run_until_suspend().await;
-        println!("USB Suspended at: {}ms", Instant::now().as_millis());
-        usb.wait_resume().await;
-        println!("USB Resumed at: {}ms", Instant::now().as_millis());
-    }
+    let (reader, mut writer) = hid.split();
+
+    let mut button = ExtiInput::new(p.PC13, p.EXTI13, Pull::Down);
+
+    // Do stuff with the class!
+    let in_fut = async {
+        loop {
+            button.wait_for_rising_edge().await;
+            // signal_pin.wait_for_high().await;
+            info!("Button pressed!");
+            // Create a report with the A key pressed. (no shift modifier)
+            let report = KeyboardReport {
+                keycodes: [4, 0, 0, 0, 0, 0],
+                leds: 0,
+                modifier: 0,
+                reserved: 0,
+            };
+            // Send the report.
+            match writer.write_serialize(&report).await {
+                Ok(()) => {}
+                Err(e) => warn!("Failed to send report: {:?}", e),
+            };
+
+            button.wait_for_falling_edge().await;
+            // signal_pin.wait_for_low().await;
+            info!("Button released!");
+            let report = KeyboardReport {
+                keycodes: [0, 0, 0, 0, 0, 0],
+                leds: 0,
+                modifier: 0,
+                reserved: 0,
+            };
+            match writer.write_serialize(&report).await {
+                Ok(()) => {}
+                Err(e) => warn!("Failed to send report: {:?}", e),
+            };
+        }
+    };
+
+    let out_fut = async {
+        reader.run(false, &mut request_handler).await;
+    };
+
+    // Run everything concurrently.
+    // If we had made everything `'static` above instead, we could do this using separate tasks instead.
+    join(usb_fut, join(in_fut, out_fut)).await;
     /* END USB DRIVER */
     loop {
         panic!("how are we here");
@@ -241,5 +275,28 @@ impl Handler for ControlHandler {
         } else {
             Some(InResponse::Rejected)
         }
+    }
+}
+
+struct MyRequestHandler {}
+
+impl RequestHandler for MyRequestHandler {
+    fn get_report(&mut self, id: ReportId, _buf: &mut [u8]) -> Option<usize> {
+        info!("Get report for {:?}", id);
+        None
+    }
+
+    fn set_report(&mut self, id: ReportId, data: &[u8]) -> OutResponse {
+        info!("Set report for {:?}: {=[u8]}", id, data);
+        OutResponse::Accepted
+    }
+
+    fn set_idle_ms(&mut self, id: Option<ReportId>, dur: u32) {
+        info!("Set idle rate for {:?} to {:?}", id, dur);
+    }
+
+    fn get_idle_ms(&mut self, id: Option<ReportId>) -> Option<u32> {
+        info!("Get idle rate for {:?}", id);
+        None
     }
 }

@@ -37,6 +37,8 @@ panic-halt = "0.2.0"
 embedded-hal-bus = "0.2.0"
 defmt = "0.3"
 
+usbd-hid = "0.8.1"
+
 [patch.crates-io]
 qingke = { path = "./qingke" }
 qingke-rt = { path = "./qingke/qingke-rt" }
