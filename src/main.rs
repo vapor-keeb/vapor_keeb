@@ -1,7 +1,5 @@
 #![no_std]
 #![no_main]
-#![feature(type_alias_impl_trait)]
-#![feature(impl_trait_in_assoc_type)]
 #![feature(naked_functions)]
 
 use core::{mem::MaybeUninit, panic::PanicInfo};
@@ -22,13 +20,10 @@ use ch32_hal::{
 use defmt::{info, println, warn, Display2Format};
 use embassy_executor::Spawner;
 use embassy_futures::join::join;
-use embassy_time::{Duration, Instant, Timer};
+use embassy_time::{Duration, Timer};
 use embassy_usb::class::hid::{HidReaderWriter, ReportId, RequestHandler, State};
-use embassy_usb::control::{InResponse, OutResponse, Recipient, Request, RequestType};
-use embassy_usb::msos::{self, windows_version};
-use embassy_usb::types::InterfaceNumber;
-use embassy_usb::{Builder, Handler};
-use embassy_usb_driver::EndpointError;
+use embassy_usb::control::OutResponse;
+use embassy_usb::Builder;
 use hal::gpio::{AnyPin, Level, Output, Pin};
 use logger::set_logger;
 use usbd_hid::descriptor::{KeyboardReport, SerializedDescriptor};
@@ -50,7 +45,7 @@ fn panic(info: &PanicInfo) -> ! {
 
 mod logger;
 
-static mut uart: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUninit::uninit();
+static mut LOGGER_UART: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUninit::uninit();
 
 #[embassy_executor::task(pool_size = 1)]
 async fn blink(pin: AnyPin, interval_ms: u64) {
@@ -75,13 +70,13 @@ async fn main(spawner: Spawner) -> ! {
     // Setup the printer
     let uart1_config = usart::Config::default();
     unsafe {
-        uart = MaybeUninit::new(
+        LOGGER_UART = MaybeUninit::new(
             UartTx::<'static, _, _>::new_blocking(p.USART1, p.PA9, uart1_config).unwrap(),
         );
     };
     set_logger(&|data| unsafe {
         #[allow(unused_must_use, static_mut_refs)]
-        uart.assume_init_mut().blocking_write(data);
+        LOGGER_UART.assume_init_mut().blocking_write(data);
     });
 
     spawner.spawn(blink(p.PB4.degrade(), 100)).unwrap();
@@ -220,61 +215,6 @@ async fn main(spawner: Spawner) -> ! {
     /* END USB DRIVER */
     loop {
         panic!("how are we here");
-    }
-}
-
-/// Handle CONTROL endpoint requests and responses. For many simple requests and responses
-/// you can get away with only using the control endpoint.
-struct ControlHandler {
-    if_num: InterfaceNumber,
-}
-
-impl Handler for ControlHandler {
-    /// Respond to HostToDevice control messages, where the host sends us a command and
-    /// optionally some data, and we can only acknowledge or reject it.
-    fn control_out<'a>(&'a mut self, req: Request, buf: &'a [u8]) -> Option<OutResponse> {
-        // Log the request before filtering to help with debugging.
-        info!("Got control_out, request={}, buf={:a}", req, buf);
-
-        // Only handle Vendor request types to an Interface.
-        if req.request_type != RequestType::Vendor || req.recipient != Recipient::Interface {
-            return None;
-        }
-
-        // Ignore requests to other interfaces.
-        if req.index != self.if_num.0 as u16 {
-            return None;
-        }
-
-        // Accept request 100, value 200, reject others.
-        if req.request == 100 && req.value == 200 {
-            Some(OutResponse::Accepted)
-        } else {
-            Some(OutResponse::Rejected)
-        }
-    }
-
-    /// Respond to DeviceToHost control messages, where the host requests some data from us.
-    fn control_in<'a>(&'a mut self, req: Request, buf: &'a mut [u8]) -> Option<InResponse<'a>> {
-        info!("Got control_in, request={}", req);
-
-        // Only handle Vendor request types to an Interface.
-        if req.request_type != RequestType::Vendor || req.recipient != Recipient::Interface {
-            return None;
-        }
-
-        // Ignore requests to other interfaces.
-        if req.index != self.if_num.0 as u16 {
-            return None;
-        }
-
-        // Respond "hello" to request 101, value 201, when asked for 5 bytes, otherwise reject.
-        if req.request == 101 && req.value == 201 && req.length == 5 {
-            buf[..5].copy_from_slice(b"hello");
-            Some(InResponse::Accepted(&buf[..5]))
-        } else {
-            Some(InResponse::Rejected)
-        }
     }
 }
 
