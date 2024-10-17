@@ -5,7 +5,7 @@
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
 use ch32_hal::exti::ExtiInput;
-use ch32_hal::gpio::Pull;
+use ch32_hal::gpio::{Input, Pull};
 use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::endpoint::EndpointDataBuffer;
 use ch32_hal::otg_fs::{self, Driver};
@@ -17,7 +17,7 @@ use ch32_hal::{
     usart::{self, UartTx},
     Config,
 };
-use defmt::{info, println, warn, Display2Format};
+use defmt::{info, println, trace, warn, Display2Format};
 use embassy_executor::Spawner;
 use embassy_futures::join::join;
 use embassy_time::{Duration, Timer};
@@ -27,6 +27,8 @@ use embassy_usb::Builder;
 use hal::gpio::{AnyPin, Level, Output, Pin};
 use logger::set_logger;
 use usbd_hid::descriptor::{KeyboardReport, SerializedDescriptor};
+
+use bitvec::prelude as bv;
 
 bind_interrupts!(struct Irq {
     OTG_FS => otg_fs::InterruptHandler<peripherals::OTG_FS>;
@@ -57,6 +59,38 @@ async fn blink(pin: AnyPin, interval_ms: u64) {
     }
 }
 
+const NR_COLS: usize = 3;
+const NR_ROWS: usize = 3;
+
+#[embassy_executor::task(pool_size = 1)]
+async fn scan(cols: [AnyPin; NR_COLS], rows: [AnyPin; NR_ROWS]) {
+    let mut key = bv::bitarr![u32, bv::Msb0; 0; NR_COLS * NR_ROWS];
+
+    let mut cols: [Output; NR_COLS] =
+        cols.map(|c| Output::new(c, Level::Low, ch32_hal::gpio::Speed::High));
+
+    let rows: [Input; NR_ROWS] = rows.map(|r| Input::new(r, Pull::Down));
+
+    loop {
+        for (col, o) in cols.iter_mut().enumerate() {
+            o.set_high();
+            Timer::after(Duration::from_nanos(20)).await;
+            for (row, i) in rows.iter().enumerate() {
+                let old_level = Level::from(*key.get(col * NR_ROWS + row).unwrap());
+                let new_level = i.get_level();
+                if old_level != new_level {
+                    trace!("<{},{}> changed to {}", row, col, new_level)
+                }
+                match new_level {
+                    Level::Low => key.set(col * NR_ROWS + row, false),
+                    Level::High => key.set(col * NR_ROWS + row, true),
+                }
+            }
+            o.set_low();
+        }
+    }
+}
+
 #[embassy_executor::main(entry = "qingke_rt::entry")]
 async fn main(spawner: Spawner) -> ! {
     // setup clocks
@@ -79,7 +113,10 @@ async fn main(spawner: Spawner) -> ! {
         LOGGER_UART.assume_init_mut().blocking_write(data);
     });
 
+    let cols: [AnyPin; NR_COLS] = [p.PC6.degrade(), p.PC7.degrade(), p.PA4.degrade()];
+    let rows: [AnyPin; NR_ROWS] = [p.PB1.degrade(), p.PC4.degrade(), p.PC5.degrade()];
     spawner.spawn(blink(p.PB4.degrade(), 100)).unwrap();
+    spawner.spawn(scan(cols, rows)).unwrap();
     // wait for serial-cat
     Timer::after_millis(300).await;
 
