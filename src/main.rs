@@ -25,8 +25,8 @@ use embassy_usb::class::hid::{HidReaderWriter, ReportId, RequestHandler, State};
 use embassy_usb::control::OutResponse;
 use embassy_usb::Builder;
 use hal::gpio::{AnyPin, Level, Output, Pin};
-use logger::set_logger;
 use usbd_hid::descriptor::{KeyboardReport, SerializedDescriptor};
+use vapor_keeb::logger::set_logger;
 
 use bitvec::prelude as bv;
 
@@ -44,8 +44,6 @@ fn panic(info: &PanicInfo) -> ! {
         loop {}
     })
 }
-
-mod logger;
 
 static mut LOGGER_UART: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUninit::uninit();
 

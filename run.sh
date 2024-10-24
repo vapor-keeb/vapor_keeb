@@ -3,7 +3,7 @@
 set -eux
 
 OS=$(uname)
-UART=${1:-/dev/ttyUSB0}
+UART="/dev/ttyUSB0"
 export DEFMT_LOG=${DEFMT_LOG:-trace}
 LOG_FORMAT=${LOG_FORMAT:-'[{L}]{f:>10}:{l:<4}: {s}'}
 LOG_FILE="usb.log"
@@ -18,8 +18,28 @@ fi
 EXE=vapor_keeb
 OUT_DIR=target/riscv32imac-unknown-none-elf/release
 
+while getopts "u:b:" opt; do
+  case $opt in
+    u)
+      UART="$OPTARG"
+      ;;
+    b)
+      BIN_NAME="$OPTARG"
+      EXE="$BIN_NAME"
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+  esac
+done
+
 if [ "${CAT:-}" == "" ] ; then
+if [[ -n "${BIN_NAME+x}" ]]; then
+cargo build --release --bin "$BIN_NAME"
+else
 cargo build --release
+fi
 $OBJDUMP -dC $OUT_DIR/$EXE > $OUT_DIR/$EXE.objdump || echo "$OBJDUMP not found, skipping OBJDUMP"
 # probe-rs download --chip CH32V307 $OUT_DIR/$EXE
 # probe-rs reset --chip CH32V307
