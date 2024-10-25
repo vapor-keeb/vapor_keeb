@@ -2,7 +2,7 @@
 #![no_main]
 #![feature(naked_functions)]
 
-use core::{mem::MaybeUninit, panic::PanicInfo};
+use core::{mem::MaybeUninit, panic::PanicInfo, convert::{From, Into},};
 
 use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::endpoint::EndpointDataBuffer;
@@ -18,9 +18,12 @@ use ch32_hal::{
 use consts::*;
 use defmt::{debug, error, info, println, Display2Format};
 use embassy_executor::Spawner;
+use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex};
+use embassy_sync::signal::Signal;
 use embassy_time::Timer;
 use embassy_usb::control::{InResponse, OutResponse, Recipient, RequestType};
 use embassy_usb::{Builder, Handler};
+use heapless::Vec;
 use vapor_keeb::logger::set_logger;
 
 mod consts;
@@ -41,6 +44,14 @@ fn panic(info: &PanicInfo) -> ! {
 static mut LOGGER_UART: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUninit::uninit();
 
 const BLOCK_SIZE: usize = 32;
+
+struct DownloadData {
+    buf: Vec<u8, 64>,
+    offset: usize,
+}
+
+static DOWNLOAD_DATA_AVAILABLE: Signal<CriticalSectionRawMutex, DownloadData> = Signal::new();
+static DOWNLOAD_COMPLETE: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 
 #[embassy_executor::main(entry = "qingke_rt::entry")]
 async fn main(spawner: Spawner) -> ! {
@@ -121,9 +132,8 @@ async fn main(spawner: Spawner) -> ! {
     let mut msos_descriptor = [0; 256];
     let mut control_buf = [0; 64];
 
-    let mut request_handler = MyRequestHandler {
-        buf: unsafe { core::mem::zeroed() },
-        state: consts::State::DfuIdle,
+    let mut request_handler = DfuRequestHandler {
+        state: DfuState::Idle,
         status: consts::Status::Ok,
     };
 
@@ -175,38 +185,115 @@ async fn main(spawner: Spawner) -> ! {
     }
 }
 
-struct MyRequestHandler {
-    buf: [u8; 64],
-    state: consts::State,
+struct DownloadState {
+    offset: usize,
+}
+
+enum DfuState {
+    Idle,
+    DownloadBusy(DownloadState),
+    Download(DownloadState),
+    Upload { offset: usize },
+    Error,
+}
+
+impl Into<consts::State> for &DfuState {
+    fn into(self) -> consts::State {
+        use consts::State;
+
+        match self {
+            DfuState::Idle => State::DfuIdle,
+            DfuState::DownloadBusy(_) => State::DownloadBusy,
+            DfuState::Download(_) => State::DownloadIdle,
+            DfuState::Upload { .. } => State::UploadIdle,
+            DfuState::Error => State::Error,
+        }
+    }
+}
+
+struct DfuRequestHandler {
+    state: DfuState,
     status: consts::Status,
 }
 
-impl Handler for MyRequestHandler {
+impl DfuRequestHandler {}
+
+impl DfuState {
+    fn handle_download(
+        DownloadState { offset }: DownloadState,
+        buf: &[u8],
+    ) -> (DfuState, OutResponse) {
+        if buf.len() == 0 {
+            return (DfuState::Idle, OutResponse::Accepted)
+        }
+        let mut vec = Vec::new();
+        match vec.extend_from_slice(buf) {
+            Ok(()) => {
+                let download_data = DownloadData { buf: vec, offset };
+                DOWNLOAD_DATA_AVAILABLE.signal(download_data);
+                (
+                    DfuState::DownloadBusy(DownloadState {
+                        offset: offset + buf.len(),
+                    }),
+                    OutResponse::Accepted,
+                )
+            }
+            Err(()) => {
+                error!("received {} bytes", buf.len());
+                (DfuState::Error, OutResponse::Rejected)
+            }
+        }
+    }
+}
+
+impl Handler for DfuRequestHandler {
     fn control_out(
         &mut self,
         req: embassy_usb::control::Request,
-        data: &[u8],
+        buf: &[u8],
     ) -> Option<OutResponse> {
         if (req.request_type, req.recipient) != (RequestType::Class, Recipient::Interface) {
             return None;
         }
-        debug!("{}", req);
         match Request::try_from(req.request) {
             Ok(dfu_req) => {
-                match dfu_req {
-                    Request::Detach => todo!(),
-                    Request::Dnload => todo!(),
-                    Request::Upload => todo!(),
-                    Request::GetStatus => todo!(),
-                    Request::ClrStatus => todo!(),
-                    Request::GetState => todo!(),
-                    Request::Abort => todo!(),
-                }
+                let (state, response) = match core::mem::replace(&mut self.state, DfuState::Error) {
+                    DfuState::Idle => match dfu_req {
+                        Request::Dnload => {
+                            DfuState::handle_download(DownloadState { offset: 0 }, buf)
+                        }
+                        Request::Abort => (DfuState::Idle, OutResponse::Accepted),
+                        r => {
+                            error!("received {} at state idle", r as u8);
+                            (DfuState::Idle, OutResponse::Rejected)
+                        }
+                    },
+                    DfuState::Download(download_state) => match dfu_req {
+                        Request::Dnload => DfuState::handle_download(download_state, buf),
+                        Request::Abort => (DfuState::Idle, OutResponse::Accepted),
+                        r => {
+                            error!("received {} at state idle", r as u8);
+                            (DfuState::Error, OutResponse::Rejected)
+                        }
+                    },
+                    DfuState::Upload { offset } => todo!(),
+                    DfuState::Error => todo!(),
+                    DfuState::DownloadBusy(download_state) => todo!(),
+                };
+                self.state = state;
             }
             Err(e) => error!("{}", e),
         }
         None
     }
+
+                    // DfuState::DownloadBusy(download_state) => match dfu_req {
+                    //     Request::
+                    //     match DOWNLOAD_COMPLETE.try_take() {
+                    //         Some(_) => (DfuState::Download(download_state), OutResponse::Accepted),
+                    //         None => (DfuState::DownloadBusy(download_state), OutResponse::Accepted),
+                    //     }
+                    // },
 
     fn control_in<'a>(
         &'a mut self,
@@ -217,22 +304,23 @@ impl Handler for MyRequestHandler {
             return None;
         }
         match Request::try_from(req.request) {
-            Ok(Request::GetStatus) => {
-                buf[0..6].copy_from_slice(&[
-                    self.status as u8,
-                    0x32,
-                    0x00,
-                    0x00,
-                    self.state as u8,
-                    0x00,
-                ]);
-
-                Some(InResponse::Accepted(&buf[0..6]))
+            Ok(Request::GetState) => {
+                buf[0] = Into::<consts::State>::into(&self.state) as u8;
+                Some(InResponse::Accepted(&buf[0..1]))
             }
-            Ok(Request::Upload) => Some(InResponse::Accepted(&buf[..])),
-            Ok(_) => {
-                debug!("{}", req);
-                None
+            Ok(Request::GetStatus) => {
+                todo!()
+            }
+            Ok(req) => {
+                let (state, response): (DfuState, InResponse<'a>) = match core::mem::replace(&mut self.state, DfuState::Error) {
+                    DfuState::Idle => todo!(),
+                    DfuState::DownloadBusy(download_state) => todo!(),
+                    DfuState::Download(download_state) => todo!(),
+                    DfuState::Upload { offset } => todo!(),
+                    DfuState::Error => todo!(),
+                };
+                todo!()
+
             }
             Err(e) => {
                 debug!("{}", e);

@@ -246,6 +246,7 @@ checksum = "b3e0c49ff02ebe324faf3a8653ba91582e2d0a7fdef5bc88f449d5aa1bfcc05c"
 dependencies = [
  "cfg-if",
  "critical-section",
+ "defmt",
  "embedded-io-async",
  "futures-util",
  "heapless",
@@ -479,6 +480,7 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0bfb9eb618601c89945a70e254898da93b13be0388091d42117462b265bb3fad"
 dependencies = [
+ "defmt",
  "hash32",
  "stable_deref_trait",
 ]
@@ -806,10 +808,12 @@ dependencies = [
  "defmt",
  "embassy-executor",
  "embassy-futures",
+ "embassy-sync",
  "embassy-time",
  "embassy-usb",
  "embassy-usb-driver",
  "embedded-hal-bus",
+ "heapless",
  "nb 1.1.0",
  "panic-halt",
  "qingke",
