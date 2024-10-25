@@ -4,8 +4,6 @@
 
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
-use ch32_hal::exti::ExtiInput;
-use ch32_hal::gpio::{Input, Pull};
 use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::endpoint::EndpointDataBuffer;
 use ch32_hal::otg_fs::{self, Driver};
@@ -18,26 +16,18 @@ use ch32_hal::{
     Config,
 };
 use consts::*;
-use defmt::{debug, info, println, trace, warn, Display2Format};
+use defmt::{debug, error, info, println, Display2Format};
 use embassy_executor::Spawner;
-use embassy_futures::join::join;
-use embassy_time::{Duration, Timer};
-use embassy_usb::class::hid::{HidReaderWriter, ReportId, RequestHandler, State};
+use embassy_time::Timer;
 use embassy_usb::control::{InResponse, OutResponse, Recipient, RequestType};
 use embassy_usb::{Builder, Handler};
-use hal::gpio::{AnyPin, Level, Output, Pin};
-use usbd_hid::descriptor::{KeyboardReport, SerializedDescriptor};
 use vapor_keeb::logger::set_logger;
-
-use bitvec::prelude as bv;
 
 mod consts;
 
 bind_interrupts!(struct Irq {
     OTG_FS => otg_fs::InterruptHandler<peripherals::OTG_FS>;
 });
-
-const DEVICE_INTERFACE_GUIDS: &[&str] = &["{DAC2087C-63FA-458D-A55D-827C0762DEC7}"];
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -81,14 +71,14 @@ async fn main(spawner: Spawner) -> ! {
     let i2c_sda = p.PB11;
     let i2c_scl = p.PB10;
 
-    let mut i2c = I2c::new_blocking(p.I2C2, i2c_scl, i2c_sda, Hertz::khz(10), Default::default());
+    let mut i2c = I2c::new_blocking(
+        p.I2C2,
+        i2c_scl,
+        i2c_sda,
+        Hertz::khz(100),
+        Default::default(),
+    );
 
-    // let i2c_sda = p.PB9;
-    // let i2c_scl = p.PB8;
-
-    // let mut i2c = I2c::new_blocking(p.I2C1, i2c_scl, i2c_sda, Hertz::khz(10), Default::default());
-
-    // info!("94");
     let mut buf = [0u8; 1];
     i2c.blocking_write(0x31, &[0x5, 0b00101011]).unwrap();
     i2c.blocking_write_read(0x31, &[0x5], &mut buf).unwrap();
@@ -136,8 +126,6 @@ async fn main(spawner: Spawner) -> ! {
         state: consts::State::DfuIdle,
         status: consts::Status::Ok,
     };
-
-    let mut state = State::new();
 
     let mut builder = Builder::new(
         driver,
@@ -204,8 +192,18 @@ impl Handler for MyRequestHandler {
         }
         debug!("{}", req);
         match Request::try_from(req.request) {
-            Ok(_) => todo!(),
-            Err(e) => debug!("{}", e),
+            Ok(dfu_req) => {
+                match dfu_req {
+                    Request::Detach => todo!(),
+                    Request::Dnload => todo!(),
+                    Request::Upload => todo!(),
+                    Request::GetStatus => todo!(),
+                    Request::ClrStatus => todo!(),
+                    Request::GetState => todo!(),
+                    Request::Abort => todo!(),
+                }
+            }
+            Err(e) => error!("{}", e),
         }
         None
     }
