@@ -2,7 +2,11 @@
 #![no_main]
 #![feature(naked_functions)]
 
-use core::{mem::MaybeUninit, panic::PanicInfo, convert::{From, Into},};
+use core::{
+    convert::{From, Into},
+    mem::MaybeUninit,
+    panic::PanicInfo,
+};
 
 use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::endpoint::EndpointDataBuffer;
@@ -15,8 +19,8 @@ use ch32_hal::{
     usart::{self, UartTx},
     Config,
 };
-use consts::*;
-use defmt::{debug, error, info, println, Display2Format};
+use consts::{DfuAttributes, DfuRequest, DfuStatus};
+use defmt::{debug, error, info, println, trace, Display2Format};
 use embassy_executor::Spawner;
 use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex};
 use embassy_sync::signal::Signal;
@@ -53,6 +57,17 @@ struct DownloadData {
 static DOWNLOAD_DATA_AVAILABLE: Signal<CriticalSectionRawMutex, DownloadData> = Signal::new();
 static DOWNLOAD_COMPLETE: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 
+#[embassy_executor::task(pool_size = 1)]
+async fn programmer() {
+    loop {
+        let data = DOWNLOAD_DATA_AVAILABLE.wait().await;
+        info!(
+            "Got data at \noffset={:x}, \ndata={:x}",
+            data.offset, data.buf
+        );
+        DOWNLOAD_COMPLETE.signal(());
+    }
+}
 #[embassy_executor::main(entry = "qingke_rt::entry")]
 async fn main(spawner: Spawner) -> ! {
     // setup clocks
@@ -75,6 +90,7 @@ async fn main(spawner: Spawner) -> ! {
         LOGGER_UART.assume_init_mut().blocking_write(data);
     });
 
+    spawner.spawn(programmer()).unwrap();
     // wait for serial-cat
     Timer::after_millis(300).await;
 
@@ -134,7 +150,6 @@ async fn main(spawner: Spawner) -> ! {
 
     let mut request_handler = DfuRequestHandler {
         state: DfuState::Idle,
-        status: consts::Status::Ok,
     };
 
     let mut builder = Builder::new(
@@ -148,16 +163,21 @@ async fn main(spawner: Spawner) -> ! {
 
     let mut func = builder.function(0x00, 0x00, 0x00);
     let mut iface = func.interface();
-    let mut alt = iface.alt_setting(
-        USB_CLASS_APPN_SPEC,
-        APPN_SPEC_SUBCLASS_DFU,
-        DFU_PROTOCOL_DFU,
-        None,
-    );
+    let mut alt = {
+        use consts::*;
+        iface.alt_setting(
+            USB_CLASS_APPN_SPEC,
+            APPN_SPEC_SUBCLASS_DFU,
+            DFU_PROTOCOL_DFU,
+            None,
+        )
+    };
+    let mut attr = DfuAttributes::empty();
+    attr.set(DfuAttributes::CAN_DOWNLOAD, true);
     alt.descriptor(
-        DESC_DFU_FUNCTIONAL,
+        consts::DESC_DFU_FUNCTIONAL,
         &[
-            DfuAttributes::empty().bits(),
+            attr.bits(),
             0xc4,
             0x09, // 2500ms timeout, doesn't affect operation as DETACH not necessary in bootloader code
             (BLOCK_SIZE & 0xff) as u8,
@@ -213,7 +233,6 @@ impl Into<consts::State> for &DfuState {
 
 struct DfuRequestHandler {
     state: DfuState,
-    status: consts::Status,
 }
 
 impl DfuRequestHandler {}
@@ -224,7 +243,8 @@ impl DfuState {
         buf: &[u8],
     ) -> (DfuState, OutResponse) {
         if buf.len() == 0 {
-            return (DfuState::Idle, OutResponse::Accepted)
+            info!("Finishing transfer");
+            return (DfuState::Idle, OutResponse::Accepted);
         }
         let mut vec = Vec::new();
         match vec.extend_from_slice(buf) {
@@ -255,24 +275,24 @@ impl Handler for DfuRequestHandler {
         if (req.request_type, req.recipient) != (RequestType::Class, Recipient::Interface) {
             return None;
         }
-        match Request::try_from(req.request) {
+        match DfuRequest::try_from(req.request) {
             Ok(dfu_req) => {
                 let (state, response) = match core::mem::replace(&mut self.state, DfuState::Error) {
                     DfuState::Idle => match dfu_req {
-                        Request::Dnload => {
+                        DfuRequest::Dnload => {
                             DfuState::handle_download(DownloadState { offset: 0 }, buf)
                         }
-                        Request::Abort => (DfuState::Idle, OutResponse::Accepted),
+                        DfuRequest::Abort => (DfuState::Idle, OutResponse::Accepted),
                         r => {
                             error!("received {} at state idle", r as u8);
                             (DfuState::Idle, OutResponse::Rejected)
                         }
                     },
                     DfuState::Download(download_state) => match dfu_req {
-                        Request::Dnload => DfuState::handle_download(download_state, buf),
-                        Request::Abort => (DfuState::Idle, OutResponse::Accepted),
+                        DfuRequest::Dnload => DfuState::handle_download(download_state, buf),
+                        DfuRequest::Abort => (DfuState::Idle, OutResponse::Accepted),
                         r => {
-                            error!("received {} at state idle", r as u8);
+                            error!("received {} at state download", r as u8);
                             (DfuState::Error, OutResponse::Rejected)
                         }
                     },
@@ -281,19 +301,14 @@ impl Handler for DfuRequestHandler {
                     DfuState::DownloadBusy(download_state) => todo!(),
                 };
                 self.state = state;
+                Some(response)
             }
-            Err(e) => error!("{}", e),
+            Err(e) => {
+                error!("unknown dfu request: {}", e);
+                Some(OutResponse::Rejected)
+            }
         }
-        None
     }
-
-                    // DfuState::DownloadBusy(download_state) => match dfu_req {
-                    //     Request::
-                    //     match DOWNLOAD_COMPLETE.try_take() {
-                    //         Some(_) => (DfuState::Download(download_state), OutResponse::Accepted),
-                    //         None => (DfuState::DownloadBusy(download_state), OutResponse::Accepted),
-                    //     }
-                    // },
 
     fn control_in<'a>(
         &'a mut self,
@@ -303,24 +318,47 @@ impl Handler for DfuRequestHandler {
         if (req.request_type, req.recipient) != (RequestType::Class, Recipient::Interface) {
             return None;
         }
-        match Request::try_from(req.request) {
-            Ok(Request::GetState) => {
+        match DfuRequest::try_from(req.request) {
+            Ok(DfuRequest::GetState) => {
                 buf[0] = Into::<consts::State>::into(&self.state) as u8;
                 Some(InResponse::Accepted(&buf[0..1]))
             }
-            Ok(Request::GetStatus) => {
-                todo!()
+            Ok(DfuRequest::GetStatus) => {
+                let (next_state, status) =
+                    match core::mem::replace(&mut self.state, DfuState::Error) {
+                        DfuState::DownloadBusy(download_state) => {
+                            match DOWNLOAD_COMPLETE.try_take() {
+                                Some(_) => (DfuState::Download(download_state), DfuStatus::Ok),
+                                None => (DfuState::DownloadBusy(download_state), DfuStatus::Ok),
+                            }
+                        }
+                        DfuState::Error => (DfuState::Error, DfuStatus::ErrUnknown),
+                        state => (state, DfuStatus::Ok),
+                    };
+                self.state = next_state;
+                let next_state = Into::<consts::State>::into(&self.state);
+                trace!(
+                    "[DFU] GetStatus=> {}, next_state={}",
+                    status as u8,
+                    next_state as u8
+                );
+                buf[0] = status as u8; // bStatus
+                                       // This is cursed.... basically the highest byte is overriden by the next line
+                buf[1..5].copy_from_slice(&(250u32.to_le_bytes())); // [1..4] bwPoolTimeout
+                buf[4] = next_state as u8; // bstate
+                buf[5] = 0; // iString
+
+                Some(InResponse::Accepted(&buf[0..6]))
             }
             Ok(req) => {
-                let (state, response): (DfuState, InResponse<'a>) = match core::mem::replace(&mut self.state, DfuState::Error) {
-                    DfuState::Idle => todo!(),
-                    DfuState::DownloadBusy(download_state) => todo!(),
-                    DfuState::Download(download_state) => todo!(),
-                    DfuState::Upload { offset } => todo!(),
-                    DfuState::Error => todo!(),
-                };
-                todo!()
-
+                let (state, response): (DfuState, InResponse<'a>) =
+                    match core::mem::replace(&mut self.state, DfuState::Error) {
+                        DfuState::Idle => todo!(),
+                        DfuState::DownloadBusy(download_state) => todo!(),
+                        DfuState::Download(download_state) => todo!(),
+                        DfuState::Upload { offset } => todo!(),
+                        DfuState::Error => todo!(),
+                    };
             }
             Err(e) => {
                 debug!("{}", e);

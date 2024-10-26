@@ -52,7 +52,7 @@ pub(crate) enum State {
 #[derive(Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
 #[allow(unused)]
-pub(crate) enum Status {
+pub(crate) enum DfuStatus {
     Ok = 0x00,
     ErrTarget = 0x01,
     ErrFile = 0x02,
@@ -73,7 +73,7 @@ pub(crate) enum Status {
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
-pub(crate) enum Request {
+pub(crate) enum DfuRequest {
     Detach = 0,
     Dnload = 1,
     Upload = 2,
@@ -83,18 +83,18 @@ pub(crate) enum Request {
     Abort = 6,
 }
 
-impl TryFrom<u8> for Request {
+impl TryFrom<u8> for DfuRequest {
     type Error = ();
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(Request::Detach),
-            1 => Ok(Request::Dnload),
-            2 => Ok(Request::Upload),
-            3 => Ok(Request::GetStatus),
-            4 => Ok(Request::ClrStatus),
-            5 => Ok(Request::GetState),
-            6 => Ok(Request::Abort),
+            0 => Ok(DfuRequest::Detach),
+            1 => Ok(DfuRequest::Dnload),
+            2 => Ok(DfuRequest::Upload),
+            3 => Ok(DfuRequest::GetStatus),
+            4 => Ok(DfuRequest::ClrStatus),
+            5 => Ok(DfuRequest::GetState),
+            6 => Ok(DfuRequest::Abort),
             _ => Err(()),
         }
     }
