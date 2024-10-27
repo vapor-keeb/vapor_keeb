@@ -27,8 +27,8 @@ embassy-usb = { version = "0.3.0", features = ["defmt"] }
 embassy-usb-driver = "0.1.0"
 nb = "1.1.0"
 
-qingke-rt = "0.3"
-qingke = "0.3"
+qingke-rt = "0.4.0"
+qingke = "0.4.0"
 
 panic-halt = "0.2.0"
 embedded-hal-bus = "0.2.0"
