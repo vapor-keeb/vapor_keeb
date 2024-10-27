@@ -761,6 +761,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "usb-dfu-target"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.6.0",
+ "defmt",
+]
+
+[[package]]
 name = "usbd-hid"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -818,6 +826,7 @@ dependencies = [
  "panic-halt",
  "qingke",
  "qingke-rt",
+ "usb-dfu-target",
  "usbd-hid",
 ]
 
