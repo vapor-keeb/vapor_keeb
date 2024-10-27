@@ -20,6 +20,8 @@ use ch32_hal::{
 use defmt::{info, println, trace, warn, Display2Format};
 use embassy_executor::Spawner;
 use embassy_futures::join::join;
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::signal::Signal;
 use embassy_time::{Duration, Timer};
 use embassy_usb::class::hid::{HidReaderWriter, ReportId, RequestHandler, State};
 use embassy_usb::control::OutResponse;
@@ -47,15 +49,7 @@ fn panic(info: &PanicInfo) -> ! {
 
 static mut LOGGER_UART: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUninit::uninit();
 
-#[embassy_executor::task(pool_size = 1)]
-async fn blink(pin: AnyPin, interval_ms: u64) {
-    let mut led = Output::new(pin, Level::Low, Default::default());
-
-    loop {
-        led.toggle();
-        Timer::after(Duration::from_millis(interval_ms)).await;
-    }
-}
+static KEY_SIGNAL: Signal<CriticalSectionRawMutex, bool> = Signal::new();
 
 const NR_COLS: usize = 3;
 const NR_ROWS: usize = 3;
@@ -77,6 +71,9 @@ async fn scan(cols: [AnyPin; NR_COLS], rows: [AnyPin; NR_ROWS]) {
                 let old_level = Level::from(*key.get(col * NR_ROWS + row).unwrap());
                 let new_level = i.get_level();
                 if old_level != new_level {
+                    if row == 0 && col == 0 {
+                        KEY_SIGNAL.signal(new_level == Level::High);
+                    }
                     trace!("<{},{}> changed to {}", row, col, new_level)
                 }
                 match new_level {
@@ -113,7 +110,6 @@ async fn main(spawner: Spawner) -> ! {
 
     let cols: [AnyPin; NR_COLS] = [p.PC6.degrade(), p.PC7.degrade(), p.PA4.degrade()];
     let rows: [AnyPin; NR_ROWS] = [p.PB1.degrade(), p.PC4.degrade(), p.PC5.degrade()];
-    spawner.spawn(blink(p.PB4.degrade(), 100)).unwrap();
     spawner.spawn(scan(cols, rows)).unwrap();
     // wait for serial-cat
     Timer::after_millis(300).await;
@@ -203,40 +199,39 @@ async fn main(spawner: Spawner) -> ! {
 
     let (reader, mut writer) = hid.split();
 
-    let mut button = ExtiInput::new(p.PC13, p.EXTI13, Pull::Down);
-
     // Do stuff with the class!
     let in_fut = async {
         loop {
-            button.wait_for_rising_edge().await;
-            // signal_pin.wait_for_high().await;
-            info!("Button pressed!");
-            // Create a report with the A key pressed. (no shift modifier)
-            let report = KeyboardReport {
-                keycodes: [4, 0, 0, 0, 0, 0],
-                leds: 0,
-                modifier: 0,
-                reserved: 0,
-            };
-            // Send the report.
-            match writer.write_serialize(&report).await {
-                Ok(()) => {}
-                Err(e) => warn!("Failed to send report: {:?}", e),
-            };
-
-            button.wait_for_falling_edge().await;
-            // signal_pin.wait_for_low().await;
-            info!("Button released!");
-            let report = KeyboardReport {
-                keycodes: [0, 0, 0, 0, 0, 0],
-                leds: 0,
-                modifier: 0,
-                reserved: 0,
-            };
-            match writer.write_serialize(&report).await {
-                Ok(()) => {}
-                Err(e) => warn!("Failed to send report: {:?}", e),
-            };
+            let sig = KEY_SIGNAL.wait().await;
+            if sig {
+                // signal_pin.wait_for_high().await;
+                info!("Button pressed!");
+                // Create a report with the A key pressed. (no shift modifier)
+                let report = KeyboardReport {
+                    keycodes: [4, 0, 0, 0, 0, 0],
+                    leds: 0,
+                    modifier: 0,
+                    reserved: 0,
+                };
+                // Send the report.
+                match writer.write_serialize(&report).await {
+                    Ok(()) => {}
+                    Err(e) => warn!("Failed to send report: {:?}", e),
+                };
+            } else {
+                // signal_pin.wait_for_low().await;
+                info!("Button released!");
+                let report = KeyboardReport {
+                    keycodes: [0, 0, 0, 0, 0, 0],
+                    leds: 0,
+                    modifier: 0,
+                    reserved: 0,
+                };
+                match writer.write_serialize(&report).await {
+                    Ok(()) => {}
+                    Err(e) => warn!("Failed to send report: {:?}", e),
+                };
+            }
         }
     };
 
