@@ -39,7 +39,7 @@ bitflags = "2.6.0"
 embassy-sync = { version = "0.6.0", features = ["defmt"] }
 heapless = { version = "0.8.0", features = ["defmt-03"] }
 
-usb-dfu-target = { path = './usb-dfu-target-rs', features = ["defmt"] }
+usb-dfu-target = { version = "0.1", features = ["defmt"] }
 
 [patch.crates-io]
 qingke = { path = "./qingke" }

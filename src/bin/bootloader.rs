@@ -5,7 +5,7 @@
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
 use ch32_hal::i2c::I2c;
-use ch32_hal::otg_fs::endpoint::EndpointDataBuffer;
+use ch32_hal::usb::EndpointDataBuffer;
 use ch32_hal::otg_fs::{self, Driver};
 use ch32_hal::time::Hertz;
 use ch32_hal::{self as hal, bind_interrupts, peripherals, usbhs};
@@ -149,7 +149,7 @@ async fn main(spawner: Spawner) -> ! {
     /* USB DRIVER SECION */
     let mut buffer: [EndpointDataBuffer; 1] =
         core::array::from_fn(|_| EndpointDataBuffer::default());
-    let driver = usbhs::Driver::new(p.USBHS, Irq, p.PB7, p.PB6, usbhs::Config {});
+    let driver = usbhs::Driver::new(p.USBHS, Irq, p.PB7, p.PB6, &mut buffer, usbhs::Config {});
 
     // Create embassy-usb Config
     let mut config = embassy_usb::Config::new(0x6666, 0xcafe);
@@ -229,7 +229,7 @@ async fn main(spawner: Spawner) -> ! {
 
     // Run everything concurrently.
     // If we had made everything `'static` above instead, we could do this using separate tasks instead.
-    usb_fut.await;
+    usb_fut.await
     /* END USB DRIVER */
 }
 

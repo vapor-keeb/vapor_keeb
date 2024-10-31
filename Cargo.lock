@@ -800,6 +800,8 @@ dependencies = [
 [[package]]
 name = "usb-dfu-target"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "208557ef21c11ae15376442f6cef4167d6c9292fafa778d114e0c43d1c3b10d0"
 dependencies = [
  "bitflags 2.6.0",
  "defmt",
