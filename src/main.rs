@@ -4,10 +4,9 @@
 
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
-use ch32_hal::exti::ExtiInput;
 use ch32_hal::gpio::{Input, Pull};
 use ch32_hal::i2c::I2c;
-use ch32_hal::otg_fs::endpoint::EndpointDataBuffer;
+use ch32_hal::usb::EndpointDataBuffer;
 use ch32_hal::otg_fs::{self, Driver};
 use ch32_hal::time::Hertz;
 use ch32_hal::{self as hal, bind_interrupts, peripherals};

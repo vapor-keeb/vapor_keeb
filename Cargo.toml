@@ -12,7 +12,6 @@ ch32-hal = { path = "./ch32-hal", features = [
     "rt",
     # "highcode",
     "time-driver-tim1",
-    "usb",
 ] }
 embassy-executor = { version = "0.6.0", features = [
     "integrated-timers",

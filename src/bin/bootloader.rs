@@ -8,7 +8,7 @@ use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::endpoint::EndpointDataBuffer;
 use ch32_hal::otg_fs::{self, Driver};
 use ch32_hal::time::Hertz;
-use ch32_hal::{self as hal, bind_interrupts, peripherals};
+use ch32_hal::{self as hal, bind_interrupts, peripherals, usbhs};
 use ch32_hal::{
     mode::Blocking,
     peripherals::USART1,
@@ -21,6 +21,7 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::signal::Signal;
 use embassy_time::Timer;
 use embassy_usb::control::{InResponse, OutResponse, Recipient, RequestType};
+use embassy_usb::msos::{self, windows_version};
 use embassy_usb::{Builder, Handler};
 use heapless::Vec;
 use usb_dfu_target::consts::{DfuAttributes, DfuRequest};
@@ -29,7 +30,11 @@ use vapor_keeb::logger::set_logger;
 
 bind_interrupts!(struct Irq {
     OTG_FS => otg_fs::InterruptHandler<peripherals::OTG_FS>;
+    USBHS => usbhs::InterruptHandler<peripherals::USBHS>;
+    USBHS_WKUP => usbhs::WakeupInterruptHandler<peripherals::USBHS>;
 });
+
+const DEVICE_INTERFACE_GUIDS: &[&str] = &["{DAC2087C-63FA-458D-A55D-827C0762DEC7}"];
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -144,18 +149,16 @@ async fn main(spawner: Spawner) -> ! {
     /* USB DRIVER SECION */
     let mut buffer: [EndpointDataBuffer; 1] =
         core::array::from_fn(|_| EndpointDataBuffer::default());
-    let driver = Driver::new(p.OTG_FS, p.PA12, p.PA11, &mut buffer);
+    let driver = usbhs::Driver::new(p.USBHS, Irq, p.PB7, p.PB6, usbhs::Config {});
 
     // Create embassy-usb Config
     let mut config = embassy_usb::Config::new(0x6666, 0xcafe);
     config.manufacturer = Some("Embassy");
     config.product = Some("USB DFU Demo");
     config.serial_number = Some("12345678");
-    config.max_power = 100;
+    config.max_power = 200;
     config.max_packet_size_0 = 64;
 
-    // Required for windows compatibility.
-    // https://developer.nordicsemi.com/nRF_Connect_SDK/doc/1.9.1/kconfig/CONFIG_CDC_ACM_IAD.html#help
     config.device_class = 0x00;
     config.device_sub_class = 0x00;
     config.device_protocol = 0x00;
@@ -163,10 +166,9 @@ async fn main(spawner: Spawner) -> ! {
 
     // Create embassy-usb DeviceBuilder using the driver and config.
     // It needs some buffers for building the descriptors.
-    let mut config_descriptor = [0; 256];
-    let mut bos_descriptor = [0; 256];
-    // You can also add a Microsoft OS descriptor.
-    let mut msos_descriptor = [0; 256];
+    let mut config_descriptor = [0; 32];
+    let mut bos_descriptor = [0; 64];
+    let mut msos_descriptor = [0; 196];
     let mut control_buf = [0; 64];
 
     let mut dfu_device_handler = DfuDemoDevice;
@@ -182,6 +184,13 @@ async fn main(spawner: Spawner) -> ! {
         &mut msos_descriptor,
         &mut control_buf,
     );
+
+    builder.msos_descriptor(windows_version::WIN8_1, 0);
+    builder.msos_feature(embassy_usb::msos::CompatibleIdFeatureDescriptor::new("WINUSB", ""));
+    builder.msos_feature(msos::RegistryPropertyFeatureDescriptor::new(
+        "DeviceInterfaceGUIDs",
+        msos::PropertyData::RegMultiSz(DEVICE_INTERFACE_GUIDS),
+    ));
 
     let mut func = builder.function(0x00, 0x00, 0x00);
     let mut iface = func.interface();
