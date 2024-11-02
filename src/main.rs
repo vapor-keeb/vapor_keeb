@@ -1,14 +1,13 @@
 #![no_std]
 #![no_main]
-#![feature(naked_functions)]
 
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
 use ch32_hal::gpio::{Input, Pull};
 use ch32_hal::i2c::I2c;
-use ch32_hal::usb::EndpointDataBuffer;
 use ch32_hal::otg_fs::{self, Driver};
 use ch32_hal::time::Hertz;
+use ch32_hal::usb::EndpointDataBuffer;
 use ch32_hal::{self as hal, bind_interrupts, peripherals};
 use ch32_hal::{
     mode::Blocking,
@@ -34,8 +33,6 @@ use bitvec::prelude as bv;
 bind_interrupts!(struct Irq {
     OTG_FS => otg_fs::InterruptHandler<peripherals::OTG_FS>;
 });
-
-const DEVICE_INTERFACE_GUIDS: &[&str] = &["{DAC2087C-63FA-458D-A55D-827C0762DEC7}"];
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -93,7 +90,6 @@ async fn main(spawner: Spawner) -> ! {
         ..Default::default()
     };
     let p = hal::init(cfg);
-    hal::embassy::init();
 
     // Setup the printer
     let uart1_config = usart::Config::default();
@@ -118,13 +114,6 @@ async fn main(spawner: Spawner) -> ! {
     let i2c_scl = p.PB10;
 
     let mut i2c = I2c::new_blocking(p.I2C2, i2c_scl, i2c_sda, Hertz::khz(10), Default::default());
-
-    // let i2c_sda = p.PB9;
-    // let i2c_scl = p.PB8;
-
-    // let mut i2c = I2c::new_blocking(p.I2C1, i2c_scl, i2c_sda, Hertz::khz(10), Default::default());
-
-    // info!("94");
     let mut buf = [0u8; 1];
     i2c.blocking_write(0x31, &[0x5, 0b00101011]).unwrap();
     i2c.blocking_write_read(0x31, &[0x5], &mut buf).unwrap();
@@ -137,7 +126,14 @@ async fn main(spawner: Spawner) -> ! {
 
     info!("Starting USB");
 
-    // loop{}
+    info!(
+        "IRQ status: {:x} {:x} {:x} {:x}",
+        ch32_hal::pac::PFIC.isr1().read().0,
+        ch32_hal::pac::PFIC.isr2().read().0,
+        ch32_hal::pac::PFIC.isr3().read().0,
+        ch32_hal::pac::PFIC.isr4().read().0,
+    );
+    // qingke::pfic::is_enabled(irq)
 
     /* USB DRIVER SECION */
     let mut buffer: [EndpointDataBuffer; 4] =

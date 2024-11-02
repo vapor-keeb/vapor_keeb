@@ -1,6 +1,5 @@
 #![no_std]
 #![no_main]
-#![feature(naked_functions)]
 
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
@@ -102,7 +101,6 @@ async fn main(spawner: Spawner) -> ! {
         ..Default::default()
     };
     let p = hal::init(cfg);
-    hal::embassy::init();
 
     // Setup the printer
     let uart1_config = usart::Config::default();
