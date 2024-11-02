@@ -17,15 +17,18 @@ fi
 
 EXE=vapor_keeb
 OUT_DIR=target/riscv32imac-unknown-none-elf/release
+EXTRA=
 
-while getopts "u:b:" opt; do
+while getopts "u:b:h" opt; do
   case $opt in
     u)
       UART="$OPTARG"
       ;;
     b)
-      BIN_NAME="$OPTARG"
-      EXE="$BIN_NAME"
+      EXE="$OPTARG"
+      ;;
+    h)
+      EXTRA+=" --features usbhs"
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
@@ -35,11 +38,7 @@ while getopts "u:b:" opt; do
 done
 
 if [ "${CAT:-}" == "" ] ; then
-if [[ -n "${BIN_NAME+x}" ]]; then
-cargo build --release --bin "$BIN_NAME"
-else
-cargo build --release
-fi
+cargo build --release --bin "$EXE" $EXTRA
 $OBJDUMP -dC $OUT_DIR/$EXE > $OUT_DIR/$EXE.objdump || echo "$OBJDUMP not found, skipping OBJDUMP"
 # probe-rs download --chip CH32V307 $OUT_DIR/$EXE
 # probe-rs reset --chip CH32V307

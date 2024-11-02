@@ -40,6 +40,9 @@ heapless = { version = "0.8.0", features = ["defmt-03"] }
 
 usb-dfu-target = { version = "0.1", features = ["defmt"] }
 
+[features]
+usbhs = []
+
 [patch.crates-io]
 qingke = { path = "./qingke" }
 qingke-rt = { path = "./qingke/qingke-rt" }

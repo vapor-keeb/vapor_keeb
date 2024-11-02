@@ -8,7 +8,7 @@ use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::{self, Driver};
 use ch32_hal::time::Hertz;
 use ch32_hal::usb::EndpointDataBuffer;
-use ch32_hal::{self as hal, bind_interrupts, peripherals};
+use ch32_hal::{self as hal, bind_interrupts, peripherals, usbhs};
 use ch32_hal::{
     mode::Blocking,
     peripherals::USART1,
@@ -32,6 +32,8 @@ use bitvec::prelude as bv;
 
 bind_interrupts!(struct Irq {
     OTG_FS => otg_fs::InterruptHandler<peripherals::OTG_FS>;
+    USBHS => usbhs::InterruptHandler<peripherals::USBHS>;
+    USBHS_WKUP => usbhs::WakeupInterruptHandler<peripherals::USBHS>;
 });
 
 #[panic_handler]
@@ -138,7 +140,12 @@ async fn main(spawner: Spawner) -> ! {
     /* USB DRIVER SECION */
     let mut buffer: [EndpointDataBuffer; 4] =
         core::array::from_fn(|_| EndpointDataBuffer::default());
+
+    #[cfg(not(feature = "usbhs"))]
     let driver = Driver::new(p.OTG_FS, p.PA12, p.PA11, &mut buffer);
+
+    #[cfg(feature = "usbhs")]
+    let driver = usbhs::Driver::new(p.USBHS, Irq, p.PB7, p.PB6, &mut buffer, usbhs::Config {});
 
     // Create embassy-usb Config
     let mut config = embassy_usb::Config::new(0xc0de, 0xcafe);
