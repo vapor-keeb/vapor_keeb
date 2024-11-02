@@ -149,6 +149,7 @@ async fn main(spawner: Spawner) -> ! {
 
     #[cfg(not(feature = "usbhs"))]
     let driver = Driver::new(p.OTG_FS, p.PA12, p.PA11, &mut buffer);
+    // let driver = usbhs::Driver::new(p.USBHS, Irq, p.PB7, p.PB6, &mut buffer, usbhs::Config {});
 
     #[cfg(feature = "usbhs")]
     let driver = usbhs::Driver::new(p.USBHS, Irq, p.PB7, p.PB6, &mut buffer, usbhs::Config {});

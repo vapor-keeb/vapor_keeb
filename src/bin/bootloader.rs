@@ -4,9 +4,9 @@
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
 use ch32_hal::i2c::I2c;
-use ch32_hal::usb::EndpointDataBuffer;
 use ch32_hal::otg_fs::{self, Driver};
 use ch32_hal::time::Hertz;
+use ch32_hal::usb::EndpointDataBuffer;
 use ch32_hal::{self as hal, bind_interrupts, peripherals, usbhs};
 use ch32_hal::{
     mode::Blocking,
@@ -184,7 +184,9 @@ async fn main(spawner: Spawner) -> ! {
     );
 
     builder.msos_descriptor(windows_version::WIN8_1, 0);
-    builder.msos_feature(embassy_usb::msos::CompatibleIdFeatureDescriptor::new("WINUSB", ""));
+    builder.msos_feature(embassy_usb::msos::CompatibleIdFeatureDescriptor::new(
+        "WINUSB", "",
+    ));
     builder.msos_feature(msos::RegistryPropertyFeatureDescriptor::new(
         "DeviceInterfaceGUIDs",
         msos::PropertyData::RegMultiSz(DEVICE_INTERFACE_GUIDS),

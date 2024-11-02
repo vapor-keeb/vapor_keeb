@@ -11,6 +11,7 @@ ch32-hal = { path = "./ch32-hal", features = [
     "rt",
     "memory-x",
     "time-driver-tim1",
+    "memory-x",
 ] }
 embassy-executor = { version = "0.6.0", features = [
     "integrated-timers",
