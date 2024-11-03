@@ -16,11 +16,14 @@ OBJDUMP=riscv64-elf-objdump
 fi
 
 EXE=vapor_keeb
-OUT_DIR=target/riscv32imac-unknown-none-elf/release
 EXTRA=
+DEBUG="--release"
 
-while getopts "u:b:h" opt; do
+while getopts "du:b:h" opt; do
   case $opt in
+    d)
+      DEBUG=""
+      ;;
     u)
       UART="$OPTARG"
       ;;
@@ -37,8 +40,14 @@ while getopts "u:b:h" opt; do
   esac
 done
 
+if [[ -z $DEBUG ]] ; then
+OUT_DIR=target/riscv32imac-unknown-none-elf/debug
+else
+OUT_DIR=target/riscv32imac-unknown-none-elf/release
+fi
+
 if [ "${CAT:-}" == "" ] ; then
-cargo build --release --bin "$EXE" $EXTRA
+cargo build $DEBUG --bin "$EXE" $EXTRA
 $OBJDUMP -dC $OUT_DIR/$EXE > $OUT_DIR/$EXE.objdump || echo "$OBJDUMP not found, skipping OBJDUMP"
 # probe-rs download --chip CH32V307 $OUT_DIR/$EXE
 # probe-rs reset --chip CH32V307

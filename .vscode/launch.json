@@ -1,0 +1,23 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "probe-rs-debug",
+            "request": "attach",
+            "name": "vapor_keeb: attach",
+            "cwd": "${workspaceFolder}",
+            "connectUnderReset": false,
+            "chip": "CH32V307",
+            "coreConfigs": [
+                {
+                    "coreIndex": 0,
+                    "programBinary": "${workspaceFolder}/target/riscv32imac-unknown-none-elf/release/vapor_keeb"
+                }
+            ],
+            "consoleLogLevel": "Console"
+        }
+    ]
+}

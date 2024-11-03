@@ -72,6 +72,12 @@ async fn scan(cols: [AnyPin; NR_COLS], rows: [AnyPin; NR_ROWS]) {
                     if row == 0 && col == 0 {
                         KEY_SIGNAL.signal(new_level == Level::High);
                     }
+                    if row == 2 && col == 2 && new_level == Level::High {
+                        unsafe {
+                            // OTGFS
+                            qingke::pfic::enable_interrupt(83);
+                        }
+                    }
                     trace!("<{},{}> changed to {}", row, col, new_level)
                 }
                 match new_level {

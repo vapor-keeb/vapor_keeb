@@ -81,7 +81,6 @@ dependencies = [
  "embassy-time",
  "embassy-time-driver",
  "embassy-usb-driver",
- "embedded-hal 0.2.7",
  "embedded-hal 1.0.0",
  "embedded-hal-async",
  "embedded-hal-nb",
@@ -563,6 +562,9 @@ name = "portable-atomic"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cc9c68a3f6da06753e9335d63e27f6b9754dd1920d941135b7ea8224f141adb2"
+dependencies = [
+ "critical-section",
+]
 
 [[package]]
 name = "proc-macro-error"
@@ -599,7 +601,7 @@ dependencies = [
 
 [[package]]
 name = "qingke"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "bit_field",
  "critical-section",
@@ -608,7 +610,7 @@ dependencies = [
 
 [[package]]
 name = "qingke-rt"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "qingke",
  "qingke-rt-macros",
@@ -616,7 +618,7 @@ dependencies = [
 
 [[package]]
 name = "qingke-rt-macros"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -863,6 +865,7 @@ dependencies = [
  "heapless",
  "nb 1.1.0",
  "panic-halt",
+ "portable-atomic",
  "qingke",
  "qingke-rt",
  "usb-dfu-target",
