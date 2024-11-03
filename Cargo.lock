@@ -81,14 +81,15 @@ dependencies = [
  "embassy-time",
  "embassy-time-driver",
  "embassy-usb-driver",
+ "embedded-hal 0.2.7",
  "embedded-hal 1.0.0",
  "embedded-hal-async",
  "embedded-hal-nb",
  "futures",
  "nb 1.1.0",
  "proc-macro2",
- "qingke",
- "qingke-rt",
+ "qingke 0.4.0",
+ "qingke-rt 0.4.0",
  "quote",
  "rand_core",
  "sdio-host",
@@ -601,6 +602,17 @@ dependencies = [
 
 [[package]]
 name = "qingke"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f626759202434af781f805f39816be09a9172b339eb0aabc196da7a3643a1c79"
+dependencies = [
+ "bit_field",
+ "critical-section",
+ "riscv 0.12.1",
+]
+
+[[package]]
+name = "qingke"
 version = "0.5.0"
 dependencies = [
  "bit_field",
@@ -610,10 +622,32 @@ dependencies = [
 
 [[package]]
 name = "qingke-rt"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ba184bd1b7dcf6bf79e66e89ae1fda01d23b948bbb07d0758f2aa6dc3d60c27"
+dependencies = [
+ "qingke 0.4.0",
+ "qingke-rt-macros 0.4.0",
+]
+
+[[package]]
+name = "qingke-rt"
 version = "0.5.0"
 dependencies = [
- "qingke",
- "qingke-rt-macros",
+ "qingke 0.5.0",
+ "qingke-rt-macros 0.5.0",
+]
+
+[[package]]
+name = "qingke-rt-macros"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0071d24b4839b7216b43e3f113354b910c9a25bf0a3d7393a4b06df9b6747c25"
+dependencies = [
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -866,8 +900,8 @@ dependencies = [
  "nb 1.1.0",
  "panic-halt",
  "portable-atomic",
- "qingke",
- "qingke-rt",
+ "qingke 0.5.0",
+ "qingke-rt 0.5.0",
  "usb-dfu-target",
  "usbd-hid",
 ]
