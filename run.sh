@@ -41,9 +41,9 @@ while getopts "du:b:h" opt; do
 done
 
 if [[ -z $DEBUG ]] ; then
-OUT_DIR=target/riscv32imac-unknown-none-elf/debug
+OUT_DIR=target/riscv32imc-unknown-none-elf/debug
 else
-OUT_DIR=target/riscv32imac-unknown-none-elf/release
+OUT_DIR=target/riscv32imc-unknown-none-elf/release
 fi
 
 if [ "${CAT:-}" == "" ] ; then
