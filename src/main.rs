@@ -115,7 +115,7 @@ async fn main(spawner: Spawner) -> ! {
     let rows: [AnyPin; NR_ROWS] = [p.PB1.degrade(), p.PC4.degrade(), p.PC5.degrade()];
     spawner.spawn(scan(cols, rows)).unwrap();
     // wait for serial-cat
-    Timer::after_millis(300).await;
+    Timer::after_millis(2000).await;
 
     // Setup I2C
     let i2c_sda = p.PB11;
