@@ -152,7 +152,7 @@ async fn main(spawner: Spawner) -> ! {
     // let driver = usbhs::Driver::new(p.USBHS, Irq, p.PB7, p.PB6, &mut buffer, usbhs::Config {});
 
     #[cfg(feature = "usbhs")]
-    let driver = usbhs::Driver::new(p.USBHS, Irq, p.PB7, p.PB6, &mut buffer, usbhs::Config {});
+    let driver = usbhs::Driver::new(p.USBHS, Irq, p.PB7, p.PB6, &mut buffer);
 
     // Create embassy-usb Config
     let mut config = embassy_usb::Config::new(0xc0de, 0xcafe);

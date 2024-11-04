@@ -147,7 +147,7 @@ async fn main(spawner: Spawner) -> ! {
     /* USB DRIVER SECION */
     let mut buffer: [EndpointDataBuffer; 1] =
         core::array::from_fn(|_| EndpointDataBuffer::default());
-    let driver = usbhs::Driver::new(p.USBHS, Irq, p.PB7, p.PB6, &mut buffer, usbhs::Config {});
+    let driver = usbhs::Driver::new(p.USBHS, Irq, p.PB7, p.PB6, &mut buffer);
 
     // Create embassy-usb Config
     let mut config = embassy_usb::Config::new(0x6666, 0xcafe);
