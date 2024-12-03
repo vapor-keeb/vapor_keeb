@@ -94,8 +94,9 @@ async fn main(spawner: Spawner) -> ! {
 
     info!("Starting USB");
 
-    usbhs::host::start::<USBHS>(p.PB7, p.PB6);
+    let (mut bus, mut driver) = usbhs::host::start::<USBHS>(p.PB7, p.PB6);
     loop {
-        Timer::after_micros(0).await
+        let event = bus.poll().await;
+        info!("Event: {}", event);
     }
 }
