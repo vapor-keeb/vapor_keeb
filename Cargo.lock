@@ -98,7 +98,7 @@ dependencies = [
 [[package]]
 name = "ch32-metapac"
 version = "0.1.0"
-source = "git+https://github.com/vapor-keeb/ch32-metapac?branch=main#3339a68445acd9b99e62e53560da23557ba468ed"
+source = "git+https://github.com/vapor-keeb/ch32-metapac?branch=main#55450a9cf95bd94ec6b9a3a28c6bc310129aa27b"
 dependencies = [
  "riscv 0.11.1",
  "vcell",

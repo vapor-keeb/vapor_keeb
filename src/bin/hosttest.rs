@@ -20,7 +20,7 @@ use embassy_executor::Spawner;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::signal::Signal;
 use embassy_time::Timer;
-use embassy_usb::control::{InResponse, OutResponse, Recipient, RequestType};
+use embassy_usb::control::{InResponse, OutResponse, Recipient, Request, RequestType};
 use embassy_usb::msos::{self, windows_version};
 use embassy_usb::{Builder, Handler};
 use heapless::Vec;
@@ -45,6 +45,11 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 static mut LOGGER_UART: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUninit::uninit();
+
+enum UsbHostState {
+    Idle,
+    AttachReset,
+}
 
 #[embassy_executor::main(entry = "qingke_rt::entry")]
 async fn main(spawner: Spawner) -> ! {
@@ -94,9 +99,22 @@ async fn main(spawner: Spawner) -> ! {
 
     info!("Starting USB");
 
-    let (mut bus, mut driver) = usbhs::host::start::<USBHS>(p.PB7, p.PB6);
+    let (mut a, mut b) = (EndpointDataBuffer::new(), EndpointDataBuffer::new());
+
+    let mut state = UsbHostState::Idle;
+    let (mut bus, mut driver) = usbhs::host::start::<USBHS>(p.PB7, p.PB6, &mut a, &mut b);
     loop {
         let event = bus.poll().await;
         info!("Event: {}", event);
+        match event {
+            usbhs::host::Event::DeviceAttach => {
+                bus.reset().await;
+                let buf = [0x80, 0x06, 0x00, 0x01, 0x00, 0x00, 0x40, 0x00];
+                driver.setup(&buf).await;
+            }
+            usbhs::host::Event::DeviceDetach => {}
+            usbhs::host::Event::Suspend => {}
+            usbhs::host::Event::Resume => {}
+        }
     }
 }
