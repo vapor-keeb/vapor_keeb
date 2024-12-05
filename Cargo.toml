@@ -58,6 +58,7 @@ debug = "full"
 strip = false   # symbols are not flashed to the microcontroller, so don't strip them.
 lto = true
 opt-level = "z" # Optimize for size.
+debug-assertions = true
 
 [profile.dev]
 debug = "full"

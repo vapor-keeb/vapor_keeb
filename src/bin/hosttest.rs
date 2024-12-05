@@ -4,7 +4,7 @@
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
 use ch32_hal::i2c::I2c;
-use ch32_hal::otg_fs::{self, Driver};
+use ch32_hal::otg_fs::{self};
 use ch32_hal::peripherals::USBHS;
 use ch32_hal::time::Hertz;
 use ch32_hal::usb::EndpointDataBuffer;
@@ -15,17 +15,10 @@ use ch32_hal::{
     usart::{self, UartTx},
     Config,
 };
-use defmt::{debug, error, info, println, trace, Display2Format};
+use defmt::{info, println, trace, Display2Format};
 use embassy_executor::Spawner;
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use embassy_sync::signal::Signal;
 use embassy_time::Timer;
-use embassy_usb::control::{InResponse, OutResponse, Recipient, Request, RequestType};
-use embassy_usb::msos::{self, windows_version};
-use embassy_usb::{Builder, Handler};
-use heapless::Vec;
-use usb_dfu_target::consts::{DfuAttributes, DfuRequest};
-use usb_dfu_target::{DfuHandler, UsbDfuDevice};
+use embassy_usb::Handler;
 use vapor_keeb::logger::set_logger;
 
 bind_interrupts!(struct Irq {
@@ -101,7 +94,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let (mut a, mut b) = (EndpointDataBuffer::new(), EndpointDataBuffer::new());
 
-    let mut state = UsbHostState::Idle;
+    let state = UsbHostState::Idle;
     let (mut bus, mut driver) = usbhs::host::start::<USBHS>(p.PB7, p.PB6, &mut a, &mut b);
     loop {
         let event = bus.poll().await;
@@ -110,8 +103,11 @@ async fn main(spawner: Spawner) -> ! {
             usbhs::host::Event::DeviceAttach => {
                 bus.reset().await;
                 let buf = [0x80, 0x06, 0x00, 0x01, 0x00, 0x00, 0x40, 0x00];
-                driver.setup(&buf).await;
-            }
+                defmt::unwrap!(driver.setup(&buf).await);
+                let mut buffer: [u8; 18] = [0u8; 18];
+                let in_result = driver.data_in(&mut buffer).await;
+                trace!("res: {} & {:x}", in_result, buffer);
+            } 
             usbhs::host::Event::DeviceDetach => {}
             usbhs::host::Event::Suspend => {}
             usbhs::host::Event::Resume => {}
