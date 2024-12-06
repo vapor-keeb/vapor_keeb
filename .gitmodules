@@ -10,3 +10,6 @@
 [submodule "usb-dfu-target-rs"]
 	path = usb-dfu-target-rs
 	url = git@github.com:vapor-keeb/usb-dfu-target-rs.git
+[submodule "async-usb-host"]
+	path = async-usb-host
+	url = git@github.com:vapor-keeb/async-usb-host.git

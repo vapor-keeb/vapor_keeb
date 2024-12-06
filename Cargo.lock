@@ -15,6 +15,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-usb-host"
+version = "0.1.0"
+dependencies = [
+ "defmt",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -874,6 +881,7 @@ dependencies = [
 name = "vapor_keeb"
 version = "0.1.0"
 dependencies = [
+ "async-usb-host",
  "bitflags 2.6.0",
  "bitvec",
  "ch32-hal",

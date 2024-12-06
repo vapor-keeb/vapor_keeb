@@ -39,6 +39,7 @@ fn panic(info: &PanicInfo) -> ! {
 
 static mut LOGGER_UART: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUninit::uninit();
 
+mod usb_host;
 enum UsbHostState {
     Idle,
     AttachReset,
