@@ -3,11 +3,13 @@
 
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
+use async_usb_host::Host;
 use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::{self};
 use ch32_hal::peripherals::USBHS;
 use ch32_hal::time::Hertz;
 use ch32_hal::usb::EndpointDataBuffer;
+use ch32_hal::usbhs::host::USBHsHostDriver;
 use ch32_hal::{self as hal, bind_interrupts, peripherals, usbhs};
 use ch32_hal::{
     mode::Blocking,
@@ -38,12 +40,6 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 static mut LOGGER_UART: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUninit::uninit();
-
-mod usb_host;
-enum UsbHostState {
-    Idle,
-    AttachReset,
-}
 
 #[embassy_executor::main(entry = "qingke_rt::entry")]
 async fn main(spawner: Spawner) -> ! {
@@ -95,23 +91,11 @@ async fn main(spawner: Spawner) -> ! {
 
     let (mut a, mut b) = (EndpointDataBuffer::new(), EndpointDataBuffer::new());
 
-    let state = UsbHostState::Idle;
-    let (mut bus, mut driver) = usbhs::host::start::<USBHS>(p.PB7, p.PB6, &mut a, &mut b);
-    loop {
-        let event = bus.poll().await;
-        info!("Event: {}", event);
-        match event {
-            usbhs::host::Event::DeviceAttach => {
-                bus.reset().await;
-                let buf = [0x80, 0x06, 0x00, 0x01, 0x00, 0x00, 0x40, 0x00];
-                defmt::unwrap!(driver.setup(&buf).await);
-                let mut buffer: [u8; 18] = [0u8; 18];
-                let in_result = driver.data_in(&mut buffer).await;
-                trace!("res: {} & {:x}", in_result, buffer);
-            } 
-            usbhs::host::Event::DeviceDetach => {}
-            usbhs::host::Event::Suspend => {}
-            usbhs::host::Event::Resume => {}
-        }
-    }
+    let driver = USBHsHostDriver::new(p.PB7, p.PB6, &mut a, &mut b);
+
+    let host = Host::new(driver);
+
+    host.run().await;
+
+    panic!()
 }
