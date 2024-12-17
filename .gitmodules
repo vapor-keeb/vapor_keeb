@@ -4,9 +4,6 @@
 [submodule "qingke"]
 	path = qingke
 	url = git@github.com:vapor-keeb/qingke.git
-[submodule "embassy"]
-	path = embassy
-	url = git@github.com:vapor-keeb/embassy.git
 [submodule "usb-dfu-target-rs"]
 	path = usb-dfu-target-rs
 	url = git@github.com:vapor-keeb/usb-dfu-target-rs.git

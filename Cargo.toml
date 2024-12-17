@@ -14,7 +14,7 @@ ch32-hal = { path = "./ch32-hal", features = [
     "time-driver-tim1",
     "memory-x",
 ] }
-embassy-executor = { version = "0.6.0", features = [
+embassy-executor = { version = "0.6.3", features = [
     "integrated-timers",
     "arch-spin",
     "executor-thread",
@@ -52,9 +52,6 @@ usbhs = []
 [patch.crates-io]
 qingke = { path = "./qingke" }
 qingke-rt = { path = "./qingke/qingke-rt" }
-embassy-executor = { path = "./embassy/embassy-executor" }
-embassy-time-driver = { path = "./embassy/embassy-time-driver" }
-embassy-time = { path = "./embassy/embassy-time" }
 
 [profile.release]
 debug = "full"
