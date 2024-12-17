@@ -19,6 +19,8 @@ name = "async-usb-host"
 version = "0.1.0"
 dependencies = [
  "defmt",
+ "embassy-futures",
+ "embassy-time",
  "static_assertions",
 ]
 

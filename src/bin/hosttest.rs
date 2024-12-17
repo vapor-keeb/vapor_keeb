@@ -93,9 +93,10 @@ async fn main(spawner: Spawner) -> ! {
 
     let driver = USBHsHostDriver::new(p.PB7, p.PB6, &mut a, &mut b);
 
-    let host = Host::new(driver);
+    let mut host = Host::new(driver);
 
-    host.run().await;
-
-    panic!()
+    loop {
+        let (host_, dev) = host.run_until_suspend().await;
+        host = host_;
+    }
 }

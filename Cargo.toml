@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-async-usb-host = { path = "./async-usb-host", features = ["defmt"] }
+async-usb-host = { path = "./async-usb-host", features = ["defmt", "embassy"] }
 ch32-hal = { path = "./ch32-hal", features = [
     "defmt",
     "ch32v305rbt6",
