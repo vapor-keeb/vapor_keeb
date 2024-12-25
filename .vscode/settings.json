@@ -3,6 +3,5 @@
     "rust-analyzer.cargo.allTargets": false,
     "rust-analyzer.linkedProjects": [
         "Cargo.toml",
-        "ch32-hal/examples/ch32v307/Cargo.toml"
     ]
 }
