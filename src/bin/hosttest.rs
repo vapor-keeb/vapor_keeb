@@ -41,6 +41,14 @@ fn panic(info: &PanicInfo) -> ! {
 
 static mut LOGGER_UART: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUninit::uninit();
 
+#[embassy_executor::task]
+async fn user_task(number: u8) {
+    loop {
+        info!("things {}", number);
+        Timer::after_secs(1).await;
+    }
+}
+
 #[embassy_executor::main(entry = "qingke_rt::entry")]
 async fn main(spawner: Spawner) -> ! {
     // setup clocks
@@ -94,6 +102,8 @@ async fn main(spawner: Spawner) -> ! {
     let driver = USBHsHostDriver::new(p.PB7, p.PB6, &mut a, &mut b);
 
     let mut host = Host::new(driver);
+
+    spawner.must_spawn(user_task(8));
 
     loop {
         let (host_, dev) = host.run_until_suspend().await;
