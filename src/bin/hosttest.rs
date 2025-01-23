@@ -3,7 +3,7 @@
 
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
-use async_usb_host::Host;
+use async_usb_host::{Host, HostControl, HostHandle};
 use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::{self};
 use ch32_hal::peripherals::USBHS;
@@ -27,6 +27,9 @@ bind_interrupts!(struct Irq {
     OTG_FS => otg_fs::InterruptHandler<peripherals::OTG_FS>;
     USBHS => usbhs::host::InterruptHandler<peripherals::USBHS>;
 });
+
+static HOST_HANDLE: HostHandle = HostHandle::new();
+static HOST_CONTROL: HostControl = HostControl::new();
 
 const DEVICE_INTERFACE_GUIDS: &[&str] = &["{DAC2087C-63FA-458D-A55D-827C0762DEC7}"];
 
@@ -101,7 +104,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let driver = USBHsHostDriver::new(p.PB7, p.PB6, &mut a, &mut b);
 
-    let mut host = Host::new(driver);
+    let mut host = Host::new(driver, &HOST_CONTROL, [&HOST_HANDLE]);
 
     spawner.must_spawn(user_task(8));
 
