@@ -3,6 +3,7 @@
 
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
+use async_usb_host::descriptor::DeviceDescriptor;
 use async_usb_host::{Host, HostControl, HostHandle};
 use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::{self};
@@ -28,10 +29,14 @@ bind_interrupts!(struct Irq {
     USBHS => usbhs::host::InterruptHandler<peripherals::USBHS>;
 });
 
-static HOST_HANDLE: HostHandle = HostHandle::new();
+static HOST_HANDLE: HostHandle = HostHandle::new(accept_device);
 static HOST_CONTROL: HostControl = HostControl::new();
 
 const DEVICE_INTERFACE_GUIDS: &[&str] = &["{DAC2087C-63FA-458D-A55D-827C0762DEC7}"];
+
+fn accept_device(desc: &DeviceDescriptor) -> bool {
+    true
+}
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -46,9 +51,10 @@ static mut LOGGER_UART: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUn
 
 #[embassy_executor::task]
 async fn user_task(number: u8) {
+    HOST_HANDLE.register().await;
     loop {
-        info!("things {}", number);
-        Timer::after_secs(1).await;
+        let msg = HOST_HANDLE.recv().await;
+        trace!("user: {:?}", msg);
     }
 }
 
@@ -109,7 +115,6 @@ async fn main(spawner: Spawner) -> ! {
     spawner.must_spawn(user_task(8));
 
     loop {
-        let (host_, dev) = host.run_until_suspend().await;
-        host = host_;
+        host.run_until_suspend().await;
     }
 }
