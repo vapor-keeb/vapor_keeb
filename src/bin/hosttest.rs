@@ -54,6 +54,8 @@ async fn user_task(number: u8) {
     HOST_HANDLE.register().await;
     loop {
         let msg = HOST_HANDLE.recv().await;
+
+
         trace!("user: {:?}", msg);
     }
 }

@@ -1,6 +1,6 @@
 [toolchain]
-channel = "stable"
-components = [ "rust-src", "rustfmt", "llvm-tools", "miri", "rust-analyzer", "clippy" ]
+channel = "beta"
+components = [ "rust-src", "rustfmt", "llvm-tools", "rust-analyzer", "clippy" ]
 targets = [
     "riscv32imc-unknown-none-elf",
 ]
