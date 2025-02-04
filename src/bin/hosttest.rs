@@ -4,6 +4,8 @@
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
 use async_usb_host::descriptor::DeviceDescriptor;
+use async_usb_host::errors::UsbHostError;
+use async_usb_host::request::Request;
 use async_usb_host::{Host, HostControl, HostHandle};
 use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::{self};
@@ -18,7 +20,7 @@ use ch32_hal::{
     usart::{self, UartTx},
     Config,
 };
-use defmt::{info, println, trace, Display2Format};
+use defmt::{unwrap, info, println, trace, warn, Display2Format};
 use embassy_executor::Spawner;
 use embassy_time::Timer;
 use embassy_usb::Handler;
@@ -55,8 +57,28 @@ async fn user_task(number: u8) {
     loop {
         let msg = HOST_HANDLE.recv().await;
 
-
         trace!("user: {:?}", msg);
+        let dev_handle = match msg {
+            async_usb_host::Host2ClientMessage::NewDevice {
+                descriptor: _,
+                handle,
+            } => Some(handle),
+            async_usb_host::Host2ClientMessage::ControlTransferResponse {
+                result: _,
+                buffer: _,
+            } => {
+                warn!("transfer? i hardly know her");
+                None
+            }
+        };
+
+        if let Some(dev_handle) = dev_handle {
+            unwrap!(
+                HOST_HANDLE
+                    .control_transfer(dev_handle, Request::set_configuration(1), &mut [])
+                    .await
+            );
+        }
     }
 }
 
