@@ -4,12 +4,10 @@
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
 use async_usb_host::descriptor::DeviceDescriptor;
-use async_usb_host::errors::UsbHostError;
 use async_usb_host::request::Request;
 use async_usb_host::{Host, HostControl, HostHandle};
 use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::{self};
-use ch32_hal::peripherals::USBHS;
 use ch32_hal::time::Hertz;
 use ch32_hal::usb::EndpointDataBuffer;
 use ch32_hal::usbhs::host::USBHsHostDriver;
@@ -20,10 +18,9 @@ use ch32_hal::{
     usart::{self, UartTx},
     Config,
 };
-use defmt::{unwrap, info, println, trace, warn, Display2Format};
+use defmt::{info, println, trace, unwrap, warn, Display2Format};
 use embassy_executor::Spawner;
 use embassy_time::Timer;
-use embassy_usb::Handler;
 use vapor_keeb::logger::set_logger;
 
 bind_interrupts!(struct Irq {

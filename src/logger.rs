@@ -7,9 +7,9 @@ static mut ENCODER: Encoder = Encoder::new();
 static LOGGER_ACQUIRED: AtomicBool = AtomicBool::new(false);
 static mut RESTORE_STATE: critical_section::RestoreState = RestoreState::invalid();
 
-static mut WRITER: Option<&'static dyn Fn(&[u8]) -> ()> = None;
+static mut WRITER: Option<&'static dyn Fn(&[u8])> = None;
 
-pub fn set_logger(write: &'static dyn Fn(&[u8]) -> ()) {
+pub fn set_logger(write: &'static dyn Fn(&[u8])) {
     unsafe { WRITER = Some(write) }
 }
 

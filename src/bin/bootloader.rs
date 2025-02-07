@@ -4,7 +4,7 @@
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
 use ch32_hal::i2c::I2c;
-use ch32_hal::otg_fs::{self, Driver};
+use ch32_hal::otg_fs::{self};
 use ch32_hal::time::Hertz;
 use ch32_hal::usb::EndpointDataBuffer;
 use ch32_hal::{self as hal, bind_interrupts, peripherals, usbhs};
@@ -14,7 +14,7 @@ use ch32_hal::{
     usart::{self, UartTx},
     Config,
 };
-use defmt::{debug, error, info, println, trace, Display2Format};
+use defmt::{info, println, Display2Format};
 use embassy_executor::Spawner;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::signal::Signal;
@@ -59,10 +59,7 @@ impl DfuHandler for DfuDemoDevice {
     fn write_data(&mut self, offset: usize, data: &[u8]) {
         let mut v = Vec::new();
         v.extend_from_slice(data).unwrap();
-        DOWNLOAD_DATA_AVAILABLE.signal(DownloadData {
-            buf: v,
-            offset: offset,
-        });
+        DOWNLOAD_DATA_AVAILABLE.signal(DownloadData { buf: v, offset });
     }
 
     fn complete_download(&mut self) {
@@ -237,7 +234,7 @@ struct DfuRequestHandler<'h> {
     inner: UsbDfuDevice<'h>,
 }
 
-impl<'h> Handler for DfuRequestHandler<'h> {
+impl Handler for DfuRequestHandler<'_> {
     fn control_out(
         &mut self,
         req: embassy_usb::control::Request,

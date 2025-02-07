@@ -252,9 +252,7 @@ async fn main(spawner: Spawner) -> ! {
     // If we had made everything `'static` above instead, we could do this using separate tasks instead.
     join(usb_fut, join(in_fut, out_fut)).await;
     /* END USB DRIVER */
-    loop {
-        panic!("how are we here");
-    }
+    panic!("how are we here");
 }
 
 struct MyRequestHandler {}
