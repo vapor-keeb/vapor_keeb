@@ -3,6 +3,7 @@
 
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
+use async_usb_host::consts::UsbBaseClass;
 use async_usb_host::descriptor::DeviceDescriptor;
 use async_usb_host::request::Request;
 use async_usb_host::{Host, HostControl, HostHandle};
@@ -34,7 +35,7 @@ static HOST_CONTROL: HostControl = HostControl::new();
 const DEVICE_INTERFACE_GUIDS: &[&str] = &["{DAC2087C-63FA-458D-A55D-827C0762DEC7}"];
 
 fn accept_device(desc: &DeviceDescriptor) -> bool {
-    true
+    desc.device_class == UsbBaseClass::HID.into()
 }
 
 #[panic_handler]
