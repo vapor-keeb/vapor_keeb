@@ -6,7 +6,7 @@ use core::{mem::MaybeUninit, panic::PanicInfo};
 use async_usb_host::consts::UsbBaseClass;
 use async_usb_host::descriptor::DeviceDescriptor;
 use async_usb_host::request::Request;
-use async_usb_host::{Host, HostControl, HostHandle};
+use async_usb_host::{Host, Host2ClientMessage, HostControl, HostHandle};
 use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::{self};
 use ch32_hal::time::Hertz;
@@ -57,17 +57,18 @@ async fn user_task(number: u8) {
 
         trace!("user: {:?}", msg);
         let dev_handle = match msg {
-            async_usb_host::Host2ClientMessage::NewDevice {
+            Host2ClientMessage::NewDevice {
                 descriptor: _,
                 handle,
             } => Some(handle),
-            async_usb_host::Host2ClientMessage::ControlTransferResponse {
+            Host2ClientMessage::ControlTransferResponse {
                 result: _,
                 buffer: _,
             } => {
                 warn!("transfer? i hardly know her");
                 None
             }
+            _ => todo!()
         };
 
         if let Some(dev_handle) = dev_handle {
