@@ -12,7 +12,7 @@ use ch32_hal::otg_fs::{self};
 use ch32_hal::time::Hertz;
 use ch32_hal::usb::EndpointDataBuffer;
 use ch32_hal::usbhs::host::USBHsHostDriver;
-use ch32_hal::{self as hal, bind_interrupts, peripherals, usbhs};
+use ch32_hal::{self as hal, bind_interrupts, peripherals, rcc, usbhs};
 use ch32_hal::{
     mode::Blocking,
     peripherals::USART1,
@@ -68,7 +68,7 @@ async fn user_task(number: u8) {
                 warn!("transfer? i hardly know her");
                 None
             }
-            _ => todo!()
+            _ => todo!(),
         };
 
         if let Some(dev_handle) = dev_handle {
@@ -84,8 +84,33 @@ async fn user_task(number: u8) {
 #[embassy_executor::main(entry = "qingke_rt::entry")]
 async fn main(spawner: Spawner) -> ! {
     // setup clocks
+    const RCC_CFG: rcc::Config = {
+        use rcc::*;
+
+        rcc::Config {
+            hse: Some(Hse {
+                freq: Hertz(16_000_000),
+                mode: HseMode::Oscillator,
+            }),
+            sys: Sysclk::PLL,
+            pll_src: PllSource::HSE,
+            pll: Some(Pll {
+                prediv: PllPreDiv::DIV2,
+                mul: PllMul::MUL18,
+            }),
+            pllx: None,
+            ahb_pre: AHBPrescaler::DIV1,
+            apb1_pre: APBPrescaler::DIV1,
+            apb2_pre: APBPrescaler::DIV1,
+            ls: LsConfig::default_lsi(),
+            hspll_src: HsPllSource::HSE,
+            hspll: Some(HsPll {
+                pre: HsPllPrescaler::DIV4,
+            }),
+        }
+    };
     let cfg = Config {
-        rcc: ch32_hal::rcc::Config::SYSCLK_FREQ_144MHZ_HSI,
+        rcc: RCC_CFG,
         ..Default::default()
     };
     let p = hal::init(cfg);
