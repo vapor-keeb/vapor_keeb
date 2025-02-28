@@ -163,6 +163,6 @@ async fn main(spawner: Spawner) -> ! {
     spawner.must_spawn(user_task(8));
 
     loop {
-        host.run_until_suspend().await;
+        host.run_until_event().await;
     }
 }
