@@ -3,10 +3,7 @@
 
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
-use async_usb_host::consts::UsbBaseClass;
-use async_usb_host::descriptor::DeviceDescriptor;
-use async_usb_host::request::Request;
-use async_usb_host::{Host, Host2ClientMessage, HostControl, HostHandle};
+use async_usb_host::Host;
 use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::{self};
 use ch32_hal::time::Hertz;
@@ -19,7 +16,7 @@ use ch32_hal::{
     usart::{self, UartTx},
     Config,
 };
-use defmt::{info, println, trace, unwrap, warn, Display2Format};
+use defmt::{info, println, Display2Format};
 use embassy_executor::Spawner;
 use embassy_time::Timer;
 use vapor_keeb::logger::set_logger;
@@ -29,14 +26,7 @@ bind_interrupts!(struct Irq {
     USBHS => usbhs::host::InterruptHandler<peripherals::USBHS>;
 });
 
-static HOST_HANDLE: HostHandle = HostHandle::new(accept_device);
-static HOST_CONTROL: HostControl = HostControl::new();
-
 const DEVICE_INTERFACE_GUIDS: &[&str] = &["{DAC2087C-63FA-458D-A55D-827C0762DEC7}"];
-
-fn accept_device(desc: &DeviceDescriptor) -> bool {
-    desc.device_class == UsbBaseClass::HID.into()
-}
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -48,38 +38,6 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 static mut LOGGER_UART: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUninit::uninit();
-
-#[embassy_executor::task]
-async fn user_task(number: u8) {
-    HOST_HANDLE.register().await;
-    loop {
-        let msg = HOST_HANDLE.recv().await;
-
-        trace!("user: {:?}", msg);
-        let dev_handle = match msg {
-            Host2ClientMessage::NewDevice {
-                descriptor: _,
-                handle,
-            } => Some(handle),
-            Host2ClientMessage::ControlTransferResponse {
-                result: _,
-                buffer: _,
-            } => {
-                warn!("transfer? i hardly know her");
-                None
-            }
-            _ => todo!(),
-        };
-
-        if let Some(dev_handle) = dev_handle {
-            unwrap!(
-                HOST_HANDLE
-                    .control_transfer(dev_handle, Request::set_configuration(1), &mut [])
-                    .await
-            );
-        }
-    }
-}
 
 #[embassy_executor::main(entry = "qingke_rt::entry")]
 async fn main(spawner: Spawner) -> ! {
@@ -158,9 +116,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let driver = USBHsHostDriver::new(p.PB7, p.PB6, &mut a, &mut b);
 
-    let mut host = Host::new(driver, &HOST_CONTROL, [&HOST_HANDLE]);
-
-    spawner.must_spawn(user_task(8));
+    let mut host = Host::<'_, _, 1, 1>::new(driver);
 
     loop {
         host.run_until_event().await;
