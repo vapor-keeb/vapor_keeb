@@ -119,6 +119,14 @@ async fn main(spawner: Spawner) -> ! {
     let mut host = Host::<'_, _, 1, 1>::new(driver);
 
     loop {
-        host.run_until_event().await;
+        let event = host.run_until_event().await;
+        match event {
+            async_usb_host::HostEvent::NewDevice { descriptor, handle } => {
+                info!("New device: {:?}", descriptor);
+            },
+            async_usb_host::HostEvent::ControlTransferResponse { result, buffer } => todo!(),
+            async_usb_host::HostEvent::InterruptTransferResponse { result, buffer } => todo!(),
+            async_usb_host::HostEvent::Suspended => (),
+        }
     }
 }
