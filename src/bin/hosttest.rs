@@ -3,7 +3,9 @@
 
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
+use async_usb_host::pipe::USBHostPipe;
 use async_usb_host::Host;
+use async_usb_host::Driver;
 use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::{self};
 use ch32_hal::time::Hertz;
@@ -115,15 +117,17 @@ async fn main(spawner: Spawner) -> ! {
     let (mut a, mut b) = (EndpointDataBuffer::new(), EndpointDataBuffer::new());
 
     let driver = USBHsHostDriver::new(p.PB7, p.PB6, &mut a, &mut b);
+    let (bus, pipe) = driver.start();
+    let pipe: USBHostPipe<USBHsHostDriver<'_, _>> = USBHostPipe::new(pipe);
 
-    let mut host = Host::<'_, _, 1, 1>::new(driver);
+    let mut host = Host::<'_, _, 1, 1>::new(bus, &pipe);
 
     loop {
         let event = host.run_until_event().await;
         match event {
             async_usb_host::HostEvent::NewDevice { descriptor, handle } => {
                 info!("New device: {:?}", descriptor);
-            },
+            }
             async_usb_host::HostEvent::ControlTransferResponse { result, buffer } => todo!(),
             async_usb_host::HostEvent::InterruptTransferResponse { result, buffer } => todo!(),
             async_usb_host::HostEvent::Suspended => (),
