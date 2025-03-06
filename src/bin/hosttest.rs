@@ -120,7 +120,7 @@ async fn main(spawner: Spawner) -> ! {
     let (bus, pipe) = driver.start();
     let pipe: USBHostPipe<USBHsHostDriver<'_, _>> = USBHostPipe::new(pipe);
 
-    let mut host = Host::<'_, _, 1, 1>::new(bus, &pipe);
+    let mut host = Host::<'_, _, 2>::new(bus, &pipe);
 
     loop {
         let event = host.run_until_event().await;
@@ -131,6 +131,9 @@ async fn main(spawner: Spawner) -> ! {
             async_usb_host::HostEvent::ControlTransferResponse { result, buffer } => todo!(),
             async_usb_host::HostEvent::InterruptTransferResponse { result, buffer } => todo!(),
             async_usb_host::HostEvent::Suspended => (),
+            async_usb_host::HostEvent::DeviceDetach => {
+                info!("Some device detached");
+            }
         }
     }
 }
