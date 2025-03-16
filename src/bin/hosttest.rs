@@ -4,8 +4,8 @@
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
 use async_usb_host::pipe::USBHostPipe;
-use async_usb_host::Host;
 use async_usb_host::Driver;
+use async_usb_host::Host;
 use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::{self};
 use ch32_hal::time::Hertz;
@@ -33,7 +33,8 @@ const DEVICE_INTERFACE_GUIDS: &[&str] = &["{DAC2087C-63FA-458D-A55D-827C0762DEC7
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     critical_section::with(|_| {
-        println!("{}", Display2Format(info));
+        // println!("{}", Display2Format(info));
+        println!("PANIC");
 
         loop {}
     })
