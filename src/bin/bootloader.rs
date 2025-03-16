@@ -67,7 +67,7 @@ impl DfuHandler for DfuDemoDevice {
         // TODO: nothing
     }
 
-    fn upload(&self, buffer: &mut [u8], offset: usize) -> usize {
+    fn upload(&self, _buffer: &mut [u8], _offset: usize) -> usize {
         todo!()
     }
 

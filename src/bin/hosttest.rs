@@ -18,7 +18,7 @@ use ch32_hal::{
     usart::{self, UartTx},
     Config,
 };
-use defmt::{info, println, Display2Format};
+use defmt::{info, println};
 use embassy_executor::Spawner;
 use embassy_time::Timer;
 use vapor_keeb::logger::set_logger;
@@ -28,10 +28,8 @@ bind_interrupts!(struct Irq {
     USBHS => usbhs::host::InterruptHandler<peripherals::USBHS>;
 });
 
-const DEVICE_INTERFACE_GUIDS: &[&str] = &["{DAC2087C-63FA-458D-A55D-827C0762DEC7}"];
-
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
+fn panic(_info: &PanicInfo) -> ! {
     critical_section::with(|_| {
         // println!("{}", Display2Format(info));
         println!("PANIC");
@@ -43,7 +41,7 @@ fn panic(info: &PanicInfo) -> ! {
 static mut LOGGER_UART: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUninit::uninit();
 
 #[embassy_executor::main(entry = "qingke_rt::entry")]
-async fn main(spawner: Spawner) -> ! {
+async fn main(_spawner: Spawner) -> ! {
     // setup clocks
     const RCC_CFG: rcc::Config = {
         use rcc::*;
@@ -127,10 +125,10 @@ async fn main(spawner: Spawner) -> ! {
         let event = host.run_until_event().await;
         match event {
             async_usb_host::HostEvent::NewDevice { descriptor, handle } => {
-                info!("New device: {:?}", descriptor);
+                info!("New device {:?} with descriptor {:?}", handle, descriptor);
             }
-            async_usb_host::HostEvent::ControlTransferResponse { result, buffer } => todo!(),
-            async_usb_host::HostEvent::InterruptTransferResponse { result, buffer } => todo!(),
+            async_usb_host::HostEvent::ControlTransferResponse { .. } => todo!(),
+            async_usb_host::HostEvent::InterruptTransferResponse { .. } => todo!(),
             async_usb_host::HostEvent::Suspended => (),
             async_usb_host::HostEvent::DeviceDetach { mask } => {
                 info!("Some device detached: {:?}", mask);
