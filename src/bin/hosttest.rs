@@ -131,8 +131,8 @@ async fn main(spawner: Spawner) -> ! {
             async_usb_host::HostEvent::ControlTransferResponse { result, buffer } => todo!(),
             async_usb_host::HostEvent::InterruptTransferResponse { result, buffer } => todo!(),
             async_usb_host::HostEvent::Suspended => (),
-            async_usb_host::HostEvent::DeviceDetach => {
-                info!("Some device detached");
+            async_usb_host::HostEvent::DeviceDetach { mask } => {
+                info!("Some device detached: {:?}", mask);
             }
         }
     }
