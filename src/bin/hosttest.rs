@@ -118,9 +118,9 @@ async fn main(spawner: Spawner) -> ! {
 
     let driver = USBHsHostDriver::new(p.PB7, p.PB6, &mut a, &mut b);
     let (bus, pipe) = driver.start();
-    let pipe: USBHostPipe<USBHsHostDriver<'_, _>> = USBHostPipe::new(pipe);
+    let pipe: USBHostPipe<USBHsHostDriver<'_, _>, 16> = USBHostPipe::new(pipe);
 
-    let mut host = Host::<'_, _, 2>::new(bus, &pipe);
+    let mut host = Host::<'_, _, 4, 16>::new(bus, &pipe);
 
     loop {
         let event = host.run_until_event().await;
