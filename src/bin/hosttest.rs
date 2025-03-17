@@ -20,7 +20,10 @@ use ch32_hal::{
 };
 use defmt::{info, println};
 use embassy_executor::Spawner;
+use embassy_futures::select;
+use embassy_futures::select::select;
 use embassy_time::Timer;
+use hid::USBHostHIDDriver;
 use vapor_keeb::logger::set_logger;
 
 bind_interrupts!(struct Irq {
@@ -31,14 +34,45 @@ bind_interrupts!(struct Irq {
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     critical_section::with(|_| {
-        // println!("{}", Display2Format(info));
-        println!("PANIC");
-
+        println!("panic with regular info");
         loop {}
     })
 }
 
 static mut LOGGER_UART: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUninit::uninit();
+
+mod hid {
+    use arrayvec::ArrayVec;
+    use async_usb_host::DeviceHandle;
+    use defmt::{panic, trace, unwrap};
+    use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
+
+    pub struct USBHostHIDDriver {
+        devices: Mutex<CriticalSectionRawMutex, ArrayVec<DeviceHandle, 4>>, // TODO: const generic
+    }
+
+    impl USBHostHIDDriver {
+        pub fn new() -> Self {
+            Self {
+                devices: Mutex::new(ArrayVec::new()),
+            }
+        }
+
+        pub async fn accept(&mut self, device: DeviceHandle) {
+            let mut devs = self.devices.lock().await;
+            if devs.try_push(device).is_err() {
+                panic!("Too many devices");
+            }
+        }
+
+        pub async fn poll(&mut self) {
+            let mut devs = self.devices.lock().await;
+            for dev in devs.iter() {
+                trace!("Polling device: {:?}", dev);
+            }
+        }
+    }
+}
 
 #[embassy_executor::main(entry = "qingke_rt::entry")]
 async fn main(_spawner: Spawner) -> ! {
@@ -119,10 +153,13 @@ async fn main(_spawner: Spawner) -> ! {
     let (bus, pipe) = driver.start();
     let pipe: USBHostPipe<USBHsHostDriver<'_, _>, 16> = USBHostPipe::new(pipe);
 
+    let mut hid = USBHostHIDDriver::new();
     let mut host = Host::<'_, _, 4, 16>::new(bus, &pipe);
 
     loop {
-        let event = host.run_until_event().await;
+        let hid_future = hid.poll();
+        let (host2, event) = host.run_until_event().await;
+        host = host2;
         match event {
             async_usb_host::HostEvent::NewDevice { descriptor, handle } => {
                 info!("New device {:?} with descriptor {:?}", handle, descriptor);

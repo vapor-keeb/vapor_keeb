@@ -3,6 +3,7 @@
 
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
+use arrayvec::ArrayVec;
 use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::{self};
 use ch32_hal::time::Hertz;
@@ -15,7 +16,7 @@ use ch32_hal::{
     usart::{self, UartTx},
     Config,
 };
-use defmt::{info, println, Display2Format};
+use defmt::{unwrap, info, println, Display2Format};
 use embassy_executor::Spawner;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::signal::Signal;
@@ -23,7 +24,6 @@ use embassy_time::Timer;
 use embassy_usb::control::{InResponse, OutResponse, Recipient, RequestType};
 use embassy_usb::msos::{self, windows_version};
 use embassy_usb::{Builder, Handler};
-use heapless::Vec;
 use usb_dfu_target::consts::{DfuAttributes, DfuRequest};
 use usb_dfu_target::{DfuHandler, UsbDfuDevice};
 use vapor_keeb::logger::set_logger;
@@ -50,7 +50,7 @@ static mut LOGGER_UART: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUn
 const BLOCK_SIZE: usize = 32;
 
 struct DownloadData {
-    buf: Vec<u8, 64>,
+    buf: ArrayVec<u8, 64>,
     offset: usize,
 }
 
@@ -58,8 +58,8 @@ struct DfuDemoDevice;
 
 impl DfuHandler for DfuDemoDevice {
     fn write_data(&mut self, offset: usize, data: &[u8]) {
-        let mut v = Vec::new();
-        v.extend_from_slice(data).unwrap();
+        let mut v = ArrayVec::new();
+        v.try_extend_from_slice(data).unwrap();
         DOWNLOAD_DATA_AVAILABLE.signal(DownloadData { buf: v, offset });
     }
 
