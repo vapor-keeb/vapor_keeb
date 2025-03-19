@@ -3,6 +3,7 @@
 
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
+use async_usb_host::driver::kbd::HidKbd;
 use async_usb_host::pipe::USBHostPipe;
 use async_usb_host::Driver;
 use async_usb_host::Host;
@@ -18,6 +19,7 @@ use ch32_hal::{
     usart::{self, UartTx},
     Config,
 };
+use defmt::error;
 use defmt::{info, println};
 use embassy_executor::Spawner;
 use embassy_futures::select;
@@ -72,6 +74,11 @@ mod hid {
             }
         }
     }
+}
+
+enum USBHostDriver {
+    NoDevice,
+    // Each kind of device you want to support
 }
 
 #[embassy_executor::main(entry = "qingke_rt::entry")]
@@ -163,6 +170,12 @@ async fn main(_spawner: Spawner) -> ! {
         match event {
             async_usb_host::HostEvent::NewDevice { descriptor, handle } => {
                 info!("New device {:?} with descriptor {:?}", handle, descriptor);
+                match HidKbd::try_attach(&pipe, handle, descriptor).await {
+                    Ok(kbd) => {
+                        info!("Keyboard attached");
+                    }
+                    Err(e) => error!("bruh: {}", e),
+                }
             }
             async_usb_host::HostEvent::ControlTransferResponse { .. } => todo!(),
             async_usb_host::HostEvent::InterruptTransferResponse { .. } => todo!(),
