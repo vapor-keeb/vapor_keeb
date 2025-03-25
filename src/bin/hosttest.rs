@@ -74,16 +74,12 @@ impl<'a, 'b, Fut: Future, const N: usize> Future for SelectPinArray<'a, 'b, Fut,
             .iter_mut()
             .enumerate()
             .find_map(|(i, f)| {
-                let r = f
-                    .as_mut()
+                f.as_mut()
                     .and_then(|f| match unsafe { Pin::new_unchecked(f) }.poll(cx) {
                         Poll::Pending => None,
                         Poll::Ready(e) => Some((i, e)),
-                    });
-                if let Some(_) = r {
-                    *f = None;
-                }
-                r
+                    })
+                    .inspect(|_| *f = None)
             });
 
         match item {
