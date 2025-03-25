@@ -1,6 +1,9 @@
 #![no_std]
 #![no_main]
 
+use core::future::Future;
+use core::pin::Pin;
+use core::task::{Context, Poll};
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
 use async_usb_host::driver::kbd::HidKbd;
@@ -22,10 +25,7 @@ use ch32_hal::{
 use defmt::error;
 use defmt::{info, println};
 use embassy_executor::Spawner;
-use embassy_futures::select;
-use embassy_futures::select::select;
 use embassy_time::Timer;
-use hid::USBHostHIDDriver;
 use vapor_keeb::logger::set_logger;
 
 bind_interrupts!(struct Irq {
@@ -43,34 +43,120 @@ fn panic(_info: &PanicInfo) -> ! {
 
 static mut LOGGER_UART: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUninit::uninit();
 
-mod hid {
-    use arrayvec::ArrayVec;
-    use async_usb_host::DeviceHandle;
-    use defmt::{panic, trace, unwrap};
-    use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
+/// Future for the [`select_array`] function.
+#[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+pub struct SelectPinArray<'a, 'b, Fut, const N: usize> {
+    inner: &'a mut Pin<&'b mut [Option<Fut>; N]>,
+}
 
-    pub struct USBHostHIDDriver {
-        devices: Mutex<CriticalSectionRawMutex, ArrayVec<DeviceHandle, 4>>, // TODO: const generic
+/// Creates a new future which will select over an array of futures.
+///
+/// The returned future will wait for any future to be ready. Upon
+/// completion the item resolved will be returned, along with the index of the
+/// future that was ready.
+///
+/// If the array is empty, the resulting future will be Pending forever.
+pub fn select_pin_array<'a, 'b, Fut: Future, const N: usize>(
+    arr: &'a mut Pin<&'b mut [Option<Fut>; N]>,
+) -> SelectPinArray<'a, 'b, Fut, N> {
+    SelectPinArray { inner: arr }
+}
+
+impl<'a, 'b, Fut: Future, const N: usize> Future for SelectPinArray<'a, 'b, Fut, N> {
+    type Output = (Fut::Output, usize);
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // Safety: Since `self` is pinned, `inner` cannot move. Since `inner` cannot move,
+        // its elements also cannot move. Therefore it is safe to access `inner` and pin
+        // references to the contained futures.
+        let item = unsafe { self.get_unchecked_mut().inner.as_mut().get_unchecked_mut() }
+            .iter_mut()
+            .enumerate()
+            .find_map(|(i, f)| {
+                let r = f
+                    .as_mut()
+                    .and_then(|f| match unsafe { Pin::new_unchecked(f) }.poll(cx) {
+                        Poll::Pending => None,
+                        Poll::Ready(e) => Some((i, e)),
+                    });
+                if let Some(_) = r {
+                    *f = None;
+                }
+                r
+            });
+
+        match item {
+            Some((idx, res)) => Poll::Ready((res, idx)),
+            None => Poll::Pending,
+        }
+    }
+}
+
+mod driver {
+    use core::{future::Future, pin::Pin};
+
+    use super::select_pin_array;
+    use arrayvec::ArrayVec;
+    use async_usb_host::{
+        descriptor::DeviceDescriptor, driver::kbd::HidKbd, errors::UsbHostError, pipe::USBHostPipe,
+        DeviceHandle, Driver,
+    };
+    use defmt::{error, panic, trace, unwrap};
+    use embassy_futures::select::{select, Either};
+    use embassy_sync::{
+        blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel, mutex::Mutex,
+    };
+
+    pub struct USBHostDriver<'a, D: Driver> {
+        pipe: &'a USBHostPipe<D, 16>,
+        new_dev: Channel<CriticalSectionRawMutex, (DeviceHandle, DeviceDescriptor), 1>,
     }
 
-    impl USBHostHIDDriver {
-        pub fn new() -> Self {
+    impl<'a, D: Driver> USBHostDriver<'a, D> {
+        pub fn new(pipe: &'a USBHostPipe<D, 16>) -> Self {
             Self {
-                devices: Mutex::new(ArrayVec::new()),
+                pipe,
+                new_dev: Channel::new(),
             }
         }
 
-        pub async fn accept(&mut self, device: DeviceHandle) {
-            let mut devs = self.devices.lock().await;
-            if devs.try_push(device).is_err() {
-                panic!("Too many devices");
-            }
+        pub async fn accept(
+            &self,
+            device: DeviceHandle,
+            descriptor: DeviceDescriptor,
+        ) -> Result<(), UsbHostError> {
+            self.new_dev.send((device, descriptor)).await;
+            Ok(())
         }
 
-        pub async fn poll(&mut self) {
-            let mut devs = self.devices.lock().await;
-            for dev in devs.iter() {
-                trace!("Polling device: {:?}", dev);
+        pub async fn run<
+            Fut: Future<Output = Result<(), UsbHostError>>,
+            F: Fn(HidKbd<'a, D, 16>) -> Fut,
+        >(
+            &mut self,
+            f: F,
+        ) {
+            let mut device_futures: [Option<Fut>; 4] = [const { None }; 4]; // TODO: const generic
+            let mut pinned: Pin<&mut [Option<Fut>; 4]> =
+                unsafe { Pin::new_unchecked(&mut device_futures) };
+
+            loop {
+                let new_dev_fut = self.new_dev.receive();
+                match select(new_dev_fut, select_pin_array(&mut pinned)).await {
+                    Either::First((device, descriptor)) => {
+                        let kbd = HidKbd::try_attach(&self.pipe, device, descriptor).await;
+                        match kbd {
+                            Ok(kbd) => unsafe {
+                                pinned.as_mut().get_unchecked_mut()[0] = Some(f(kbd));
+                            },
+                            Err(e) => {
+                                error!("Failed to attach keyboard: {}", e);
+                            }
+                        }
+                    }
+                    Either::Second(fut) => {}
+                }
             }
         }
     }
@@ -160,11 +246,9 @@ async fn main(_spawner: Spawner) -> ! {
     let (bus, pipe) = driver.start();
     let pipe: USBHostPipe<USBHsHostDriver<'_, _>, 16> = USBHostPipe::new(pipe);
 
-    let mut hid = USBHostHIDDriver::new();
     let mut host = Host::<'_, _, 4, 16>::new(bus, &pipe);
 
     loop {
-        let hid_future = hid.poll();
         let (host2, event) = host.run_until_event().await;
         host = host2;
         match event {
