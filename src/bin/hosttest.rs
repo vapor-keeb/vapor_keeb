@@ -24,6 +24,7 @@ use ch32_hal::{
 };
 use defmt::error;
 use defmt::{info, println};
+use driver::USBHostDriver;
 use embassy_executor::Spawner;
 use embassy_time::Timer;
 use vapor_keeb::logger::set_logger;
@@ -104,26 +105,19 @@ mod driver {
         blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel, mutex::Mutex,
     };
 
-    pub struct USBHostDriver<'a, D: Driver> {
+    pub type DeviceChannel = Channel<CriticalSectionRawMutex, (DeviceHandle, DeviceDescriptor), 1>;
+
+    pub struct USBHostDriver<'a, D: Driver, const MAX_DEVICES: usize = 4> {
         pipe: &'a USBHostPipe<D, 16>,
-        new_dev: Channel<CriticalSectionRawMutex, (DeviceHandle, DeviceDescriptor), 1>,
+        new_dev: &'a DeviceChannel,
     }
 
-    impl<'a, D: Driver> USBHostDriver<'a, D> {
-        pub fn new(pipe: &'a USBHostPipe<D, 16>) -> Self {
+    impl<'a, D: Driver, const MAX_DEVICES: usize> USBHostDriver<'a, D, MAX_DEVICES> {
+        pub fn new(pipe: &'a USBHostPipe<D, 16>, new_dev: &'a DeviceChannel) -> Self {
             Self {
                 pipe,
-                new_dev: Channel::new(),
+                new_dev,
             }
-        }
-
-        pub async fn accept(
-            &self,
-            device: DeviceHandle,
-            descriptor: DeviceDescriptor,
-        ) -> Result<(), UsbHostError> {
-            self.new_dev.send((device, descriptor)).await;
-            Ok(())
         }
 
         pub async fn run<
@@ -133,8 +127,8 @@ mod driver {
             &mut self,
             f: F,
         ) {
-            let mut device_futures: [Option<Fut>; 4] = [const { None }; 4]; // TODO: const generic
-            let mut pinned: Pin<&mut [Option<Fut>; 4]> =
+            let mut device_futures: [Option<Fut>; MAX_DEVICES] = core::array::from_fn(|_| None);
+            let mut pinned: Pin<&mut [Option<Fut>; MAX_DEVICES]> =
                 unsafe { Pin::new_unchecked(&mut device_futures) };
 
             loop {
@@ -143,24 +137,36 @@ mod driver {
                     Either::First((device, descriptor)) => {
                         let kbd = HidKbd::try_attach(&self.pipe, device, descriptor).await;
                         match kbd {
-                            Ok(kbd) => unsafe {
-                                pinned.as_mut().get_unchecked_mut()[0] = Some(f(kbd));
+                            Ok(kbd) => {
+                                // Find an empty slot for the new device
+                                if let Some(empty_slot) = unsafe { pinned.as_mut().get_unchecked_mut() }
+                                    .iter_mut()
+                                    .position(|slot| slot.is_none())
+                                {
+                                    unsafe {
+                                        pinned.as_mut().get_unchecked_mut()[empty_slot] = Some(f(kbd));
+                                    }
+                                    trace!("Device added to slot {}", empty_slot);
+                                } else {
+                                    error!("No empty slots available for new device");
+                                }
                             },
                             Err(e) => {
                                 error!("Failed to attach keyboard: {}", e);
                             }
                         }
                     }
-                    Either::Second(fut) => {}
+                    Either::Second((result, idx)) => {
+                        match result {
+                            Ok(_) => trace!("Device at slot {} completed successfully", idx),
+                            Err(e) => error!("Device error at slot {}: {}", idx, e),
+                        }
+                        // The slot is already cleared by the select_pin_array implementation
+                    }
                 }
             }
         }
     }
-}
-
-enum USBHostDriver {
-    NoDevice,
-    // Each kind of device you want to support
 }
 
 #[embassy_executor::main(entry = "qingke_rt::entry")]
@@ -241,28 +247,68 @@ async fn main(_spawner: Spawner) -> ! {
     let driver = USBHsHostDriver::new(p.PB7, p.PB6, &mut a, &mut b);
     let (bus, pipe) = driver.start();
     let pipe: USBHostPipe<USBHsHostDriver<'_, _>, 16> = USBHostPipe::new(pipe);
-
+    
+    // Create the device channel
+    let new_dev_channel = driver::DeviceChannel::new();
+    
+    // Create our host driver with support for multiple devices
+    let mut host_driver = USBHostDriver::<_, 8>::new(&pipe, &new_dev_channel);
     let mut host = Host::<'_, _, 4, 16>::new(bus, &pipe);
 
+    // Create a keyboard handler function
+    let kbd_handler = |kbd: HidKbd<'_, _, 16>| async move {
+        info!("Keyboard connected!");
+        // Handle keyboard events here
+        Ok(())
+    };
+
+    // Create the futures for host_driver and host
+    let mut host_driver_fut = Some(host_driver.run(kbd_handler));
+    let mut host_fut = Some(host.run_until_event());
+
+    // Pin the futures
+    let mut pinned_host_driver_fut = unsafe { Pin::new_unchecked(&mut host_driver_fut) };
+    let mut pinned_host_fut = unsafe { Pin::new_unchecked(&mut host_fut) };
+
+    // Import the select_pin2 function
+    use vapor_keeb::selectpin2::{select_pin2, Either};
+
     loop {
-        let (host2, event) = host.run_until_event().await;
-        host = host2;
-        match event {
-            async_usb_host::HostEvent::NewDevice { descriptor, handle } => {
-                info!("New device {:?} with descriptor {:?}", handle, descriptor);
-                match HidKbd::try_attach(&pipe, handle, descriptor).await {
-                    Ok(kbd) => {
-                        info!("Keyboard attached");
-                    }
-                    Err(e) => error!("bruh: {}", e),
-                }
+        match select_pin2(&mut pinned_host_driver_fut, &mut pinned_host_fut).await {
+            Either::First(_) => {
+                // host_driver exited, which shouldn't happen in normal operation
+                error!("USB Host driver exited unexpectedly");
+                break; // Exit the loop as requested
             }
-            async_usb_host::HostEvent::ControlTransferResponse { .. } => todo!(),
-            async_usb_host::HostEvent::InterruptTransferResponse { .. } => todo!(),
-            async_usb_host::HostEvent::Suspended => (),
-            async_usb_host::HostEvent::DeviceDetach { mask } => {
-                info!("Some device detached: {:?}", mask);
+            Either::Second((new_host, event)) => {
+                // Update the host with the new state
+                host = new_host;
+                
+                // Handle the event
+                match event {
+                    async_usb_host::HostEvent::NewDevice { descriptor, handle } => {
+                        info!("New device {:?} with descriptor {:?}", handle, descriptor);
+                        // Send directly to the channel instead of using accept
+                        new_dev_channel.send((handle, descriptor)).await;
+                    }
+                    async_usb_host::HostEvent::ControlTransferResponse { .. } => todo!(),
+                    async_usb_host::HostEvent::InterruptTransferResponse { .. } => todo!(),
+                    async_usb_host::HostEvent::Suspended => (),
+                    async_usb_host::HostEvent::DeviceDetach { mask } => {
+                        info!("Some device detached: {:?}", mask);
+                    }
+                }
+                
+                // Create a new future for the host and update the pinned reference
+                host_fut = Some(host.run_until_event());
+                pinned_host_fut = unsafe { Pin::new_unchecked(&mut host_fut) };
             }
         }
+    }
+    
+    // We should never reach here, but if we do, loop forever
+    loop {
+        error!("USB Host system has stopped!");
+        Timer::after_secs(1).await;
     }
 }
