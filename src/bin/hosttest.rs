@@ -7,6 +7,7 @@ use core::task::{Context, Poll};
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
 use async_usb_host::driver::kbd::HidKbd;
+use async_usb_host::errors::UsbHostError;
 use async_usb_host::pipe::USBHostPipe;
 use async_usb_host::Driver;
 use async_usb_host::Host;
@@ -35,9 +36,17 @@ bind_interrupts!(struct Irq {
 });
 
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
+fn panic(info: &PanicInfo) -> ! {
     critical_section::with(|_| {
-        println!("panic with regular info");
+        if let Some(location) = info.location() {
+            println!(
+                "panic occurred in file '{}' at line {}",
+                location.file(),
+                location.line()
+            );
+        } else {
+            println!("panic occurred but can't get location information...");
+        }
         loop {}
     })
 }
@@ -114,15 +123,12 @@ mod driver {
 
     impl<'a, D: Driver, const MAX_DEVICES: usize> USBHostDriver<'a, D, MAX_DEVICES> {
         pub fn new(pipe: &'a USBHostPipe<D, 16>, new_dev: &'a DeviceChannel) -> Self {
-            Self {
-                pipe,
-                new_dev,
-            }
+            Self { pipe, new_dev }
         }
 
         pub async fn run<
             Fut: Future<Output = Result<(), UsbHostError>>,
-            F: Fn(HidKbd<'a, D, 16>) -> Fut,
+            F: Fn(HidKbd, &'a USBHostPipe<D, 16>) -> Fut,
         >(
             &mut self,
             f: F,
@@ -135,22 +141,24 @@ mod driver {
                 let new_dev_fut = self.new_dev.receive();
                 match select(new_dev_fut, select_pin_array(&mut pinned)).await {
                     Either::First((device, descriptor)) => {
-                        let kbd = HidKbd::try_attach(&self.pipe, device, descriptor).await;
+                        let kbd = HidKbd::try_attach(self.pipe, device, descriptor).await;
                         match kbd {
                             Ok(kbd) => {
                                 // Find an empty slot for the new device
-                                if let Some(empty_slot) = unsafe { pinned.as_mut().get_unchecked_mut() }
-                                    .iter_mut()
-                                    .position(|slot| slot.is_none())
+                                if let Some(empty_slot) =
+                                    unsafe { pinned.as_mut().get_unchecked_mut() }
+                                        .iter_mut()
+                                        .position(|slot| slot.is_none())
                                 {
                                     unsafe {
-                                        pinned.as_mut().get_unchecked_mut()[empty_slot] = Some(f(kbd));
+                                        pinned.as_mut().get_unchecked_mut()[empty_slot] =
+                                            Some(f(kbd, self.pipe));
                                     }
                                     trace!("Device added to slot {}", empty_slot);
                                 } else {
                                     error!("No empty slots available for new device");
                                 }
-                            },
+                            }
                             Err(e) => {
                                 error!("Failed to attach keyboard: {}", e);
                             }
@@ -247,19 +255,22 @@ async fn main(_spawner: Spawner) -> ! {
     let driver = USBHsHostDriver::new(p.PB7, p.PB6, &mut a, &mut b);
     let (bus, pipe) = driver.start();
     let pipe: USBHostPipe<USBHsHostDriver<'_, _>, 16> = USBHostPipe::new(pipe);
-    
+
     // Create the device channel
     let new_dev_channel = driver::DeviceChannel::new();
-    
+
     // Create our host driver with support for multiple devices
     let mut host_driver = USBHostDriver::<_, 8>::new(&pipe, &new_dev_channel);
     let mut host = Host::<'_, _, 4, 16>::new(bus, &pipe);
 
     // Create a keyboard handler function
-    let kbd_handler = |kbd: HidKbd<'_, _, 16>| async move {
+    async fn kbd_handler<'a, D: Driver>(
+        kbd: HidKbd,
+        pipe: &'a USBHostPipe<D, 16>,
+    ) -> Result<(), UsbHostError> {
         info!("Keyboard connected!");
         // Handle keyboard events here
-        Ok(())
+        kbd.run(pipe).await
     };
 
     // Create the futures for host_driver and host
@@ -283,7 +294,7 @@ async fn main(_spawner: Spawner) -> ! {
             Either::Second((new_host, event)) => {
                 // Update the host with the new state
                 host = new_host;
-                
+
                 // Handle the event
                 match event {
                     async_usb_host::HostEvent::NewDevice { descriptor, handle } => {
@@ -298,14 +309,14 @@ async fn main(_spawner: Spawner) -> ! {
                         info!("Some device detached: {:?}", mask);
                     }
                 }
-                
+
                 // Create a new future for the host and update the pinned reference
                 host_fut = Some(host.run_until_event());
                 pinned_host_fut = unsafe { Pin::new_unchecked(&mut host_fut) };
             }
         }
     }
-    
+
     // We should never reach here, but if we do, loop forever
     loop {
         error!("USB Host system has stopped!");
