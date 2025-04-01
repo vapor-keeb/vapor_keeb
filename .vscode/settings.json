@@ -1,6 +1,5 @@
 {
     "git.autoRepositoryDetection": "subFolders",
-    "rust-analyzer.cargo.allTargets": true,
     "rust-analyzer.cfg.setTest": false,
     "rust-analyzer.linkedProjects": [
         "Cargo.toml",
