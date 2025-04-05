@@ -125,34 +125,28 @@ async fn main(_spawner: Spawner) -> ! {
 
     println!("0x21 0x5 reg: {:#b}", buf[0]);
 
+    let sp: usize;
+    unsafe { core::arch::asm!("mv {}, sp", out(reg) sp) };
+    info!("sp is at {:#x}", sp);
     info!("Starting USB");
 
     let (mut a, mut b) = (EndpointDataBuffer::new(), EndpointDataBuffer::new());
 
+    const NR_DEVICES: usize = 14;
     let driver = USBHsHostDriver::new(p.PB7, p.PB6, &mut a, &mut b);
     let (bus, pipe) = driver.start();
-    let pipe: USBHostPipe<USBHsHostDriver<'_, _>, 16> = USBHostPipe::new(pipe);
+    let pipe: USBHostPipe<USBHsHostDriver<'_, _>, NR_DEVICES> = USBHostPipe::new(pipe);
 
     // Create the device channel
     let new_dev_channel = async_usb_host::driver::DeviceChannel::new();
 
     // Create our host driver with support for multiple devices
     let mut host_driver =
-        async_usb_host::driver::USBHostDriver::<_, 8>::new(&pipe, &new_dev_channel);
-    let mut host = Host::<'_, _, 4, 16>::new(bus, &pipe);
-
-    // Create a keyboard handler function
-    async fn kbd_handler<'a, D: HostDriver>(
-        kbd: HidKbd,
-        pipe: &'a USBHostPipe<D, 16>,
-    ) -> Result<(), UsbHostError> {
-        info!("Keyboard connected!");
-        // Handle keyboard events here
-        kbd.run(pipe).await
-    }
+        async_usb_host::driver::USBDeviceDispatcher::<HidKbd, _, NR_DEVICES>::new(&pipe, &new_dev_channel);
+    let mut host = Host::<'_, _, 4, NR_DEVICES>::new(bus, &pipe);
 
     // Create the futures for host_driver and host
-    let host_driver_fut = host_driver.run(kbd_handler);
+    let host_driver_fut = host_driver.run();
     let host_fut = host.run_until_event();
 
     // Create and pin the SelectPin2 instance
