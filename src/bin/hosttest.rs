@@ -2,16 +2,16 @@
 #![no_main]
 
 use core::future::Future;
-use core::pin::Pin;
+use core::pin::{pin, Pin};
 use core::task::{Context, Poll};
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
 use async_usb_host::driver::kbd::HidKbd;
 use async_usb_host::errors::UsbHostError;
-use async_usb_host::futures::select_pin2;
+use async_usb_host::futures::SelectPin2;
 use async_usb_host::pipe::USBHostPipe;
-use async_usb_host::HostDriver;
 use async_usb_host::Host;
+use async_usb_host::HostDriver;
 use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::{self};
 use ch32_hal::time::Hertz;
@@ -27,7 +27,7 @@ use ch32_hal::{
 use defmt::error;
 use defmt::{info, println};
 use embassy_executor::Spawner;
-use embassy_futures::select::Either;
+use embassy_futures::select::{select, Either};
 use embassy_time::Timer;
 use vapor_keeb::logger::set_logger;
 
@@ -137,7 +137,8 @@ async fn main(_spawner: Spawner) -> ! {
     let new_dev_channel = async_usb_host::driver::DeviceChannel::new();
 
     // Create our host driver with support for multiple devices
-    let mut host_driver = async_usb_host::driver::USBHostDriver::<_, 8>::new(&pipe, &new_dev_channel);
+    let mut host_driver =
+        async_usb_host::driver::USBHostDriver::<_, 8>::new(&pipe, &new_dev_channel);
     let mut host = Host::<'_, _, 4, 16>::new(bus, &pipe);
 
     // Create a keyboard handler function
@@ -151,15 +152,14 @@ async fn main(_spawner: Spawner) -> ! {
     }
 
     // Create the futures for host_driver and host
-    let mut host_driver_fut = Some(host_driver.run(kbd_handler));
-    let mut host_fut = Some(host.run_until_event());
+    let host_driver_fut = host_driver.run(kbd_handler);
+    let host_fut = host.run_until_event();
 
-    // Pin the futures
-    let mut pinned_host_driver_fut = unsafe { Pin::new_unchecked(&mut host_driver_fut) };
-    let mut pinned_host_fut = unsafe { Pin::new_unchecked(&mut host_fut) };
+    // Create and pin the SelectPin2 instance
+    let mut select = pin!(SelectPin2::with_futures(host_driver_fut, host_fut));
 
     loop {
-        match select_pin2(&mut pinned_host_driver_fut, &mut pinned_host_fut).await {
+        match select.as_mut().await {
             Either::First(_) => {
                 // host_driver exited, which shouldn't happen in normal operation
                 error!("USB Host driver exited unexpectedly");
@@ -184,9 +184,9 @@ async fn main(_spawner: Spawner) -> ! {
                     }
                 }
 
-                // Create a new future for the host and update the pinned reference
-                host_fut = Some(host.run_until_event());
-                pinned_host_fut = unsafe { Pin::new_unchecked(&mut host_fut) };
+                // Create a new future for the host and insert it into the selector
+                let new_host_fut = host.run_until_event();
+                defmt::unwrap!(select.as_mut().insert_fut2(new_host_fut));
             }
         }
     }
