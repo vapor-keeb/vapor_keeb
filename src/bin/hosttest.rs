@@ -17,7 +17,7 @@ use ch32_hal::otg_fs::{self};
 use ch32_hal::time::Hertz;
 use ch32_hal::usb::EndpointDataBuffer;
 use ch32_hal::usbhs::host::USBHsHostDriver;
-use ch32_hal::{self as hal, bind_interrupts, peripherals, rcc, usbhs};
+use ch32_hal::{self as hal, bind_interrupts, gpio, peripherals, rcc, usbhs};
 use ch32_hal::{
     mode::Blocking,
     peripherals::USART1,
@@ -29,7 +29,7 @@ use defmt::{info, println};
 use embassy_executor::Spawner;
 use embassy_futures::select::{select, Either};
 use embassy_time::Timer;
-use vapor_keeb::logger::set_logger;
+use vapor_keeb::logger::{self, set_logger};
 
 bind_interrupts!(struct Irq {
     OTG_FS => otg_fs::InterruptHandler<peripherals::OTG_FS>;
@@ -56,11 +56,10 @@ static mut LOGGER_UART: MaybeUninit<UartTx<'static, USART1, Blocking>> = MaybeUn
 
 #[embassy_executor::main(entry = "qingke_rt::entry")]
 async fn main(_spawner: Spawner) -> ! {
-    // setup clocks
-    const RCC_CFG: rcc::Config = {
+    let rcc_cfg: rcc::Config = {
         use rcc::*;
 
-        rcc::Config {
+        Config {
             hse: Some(Hse {
                 freq: Hertz(16_000_000),
                 mode: HseMode::Oscillator,
@@ -82,8 +81,10 @@ async fn main(_spawner: Spawner) -> ! {
             }),
         }
     };
+
+    // setup clocks
     let cfg = Config {
-        rcc: RCC_CFG,
+        rcc: rcc_cfg,
         ..Default::default()
     };
     let p = hal::init(cfg);
@@ -132,25 +133,22 @@ async fn main(_spawner: Spawner) -> ! {
 
     let (mut a, mut b) = (EndpointDataBuffer::new(), EndpointDataBuffer::new());
 
-    const NR_DEVICES: usize = 14;
+    const NR_DEVICES: usize = 16;
     let driver = USBHsHostDriver::new(p.PB7, p.PB6, &mut a, &mut b);
     let (bus, pipe) = driver.start();
     let pipe: USBHostPipe<USBHsHostDriver<'_, _>, NR_DEVICES> = USBHostPipe::new(pipe);
 
-    // Create the device channel
-    let new_dev_channel = async_usb_host::driver::DeviceChannel::new();
-
     // Create our host driver with support for multiple devices
-    let mut host_driver =
-        async_usb_host::driver::USBDeviceDispatcher::<HidKbd, _, NR_DEVICES>::new(&pipe, &new_dev_channel);
+    let mut host_dispatcher =
+        async_usb_host::driver::USBDeviceDispatcher::<HidKbd, _, NR_DEVICES>::new(&pipe);
     let mut host = Host::<'_, _, 4, NR_DEVICES>::new(bus, &pipe);
 
     // Create the futures for host_driver and host
-    let host_driver_fut = host_driver.run();
+    let host_dispatcher_fut = host_dispatcher.run();
     let host_fut = host.run_until_event();
 
     // Create and pin the SelectPin2 instance
-    let mut select = pin!(SelectPin2::with_futures(host_driver_fut, host_fut));
+    let mut select = pin!(SelectPin2::with_futures(host_dispatcher_fut, host_fut));
 
     loop {
         match select.as_mut().await {
@@ -168,7 +166,7 @@ async fn main(_spawner: Spawner) -> ! {
                     async_usb_host::HostEvent::NewDevice { descriptor, handle } => {
                         info!("New device {:?} with descriptor {:?}", handle, descriptor);
                         // Send directly to the channel instead of using accept
-                        new_dev_channel.send((handle, descriptor)).await;
+                        host_dispatcher.insert_new_device(handle, descriptor).await;
                     }
                     async_usb_host::HostEvent::ControlTransferResponse { .. } => todo!(),
                     async_usb_host::HostEvent::InterruptTransferResponse { .. } => todo!(),
