@@ -19,6 +19,8 @@ embassy-executor = { version = "0.6.3", features = [
     "integrated-timers",
     "arch-spin",
     "executor-thread",
+    # https://docs.rs/embassy-executor/latest/embassy_executor/#task-arena-size
+    "task-arena-size-8192",
 ] }
 embassy-futures = "0.1.1"
 
