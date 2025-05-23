@@ -134,10 +134,12 @@ async fn main(_spawner: Spawner) -> ! {
     i2c.blocking_write(0x31, &[0x5, 0b00101011]).unwrap();
     i2c.blocking_write_read(0x31, &[0x5], &mut buf).unwrap();
     println!("0x31 0x5 reg: {:#b}", buf[0]);
+    i2c.blocking_write(0x31, &[0x03, 0b0100_0111]);
 
     i2c.blocking_write(0x21, &[0x5, 0b00101011]).unwrap();
     i2c.blocking_write_read(0x21, &[0x5], &mut buf).unwrap();
     println!("0x21 0x5 reg: {:#b}", buf[0]);
+    i2c.blocking_write(0x21, &[0x03, 0b0100_0111]);
 
     let sp: usize;
     unsafe { core::arch::asm!("mv {}, sp", out(reg) sp) };
