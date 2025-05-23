@@ -22,6 +22,7 @@ pub struct Logger;
 
 #[allow(static_mut_refs)]
 unsafe impl defmt::Logger for Logger {
+    #[inline(never)]
     fn acquire() {
         let cs_handle = unsafe { critical_section::acquire() };
         let acquired = LOGGER_ACQUIRED.load(Ordering::Acquire);
@@ -38,6 +39,7 @@ unsafe impl defmt::Logger for Logger {
 
     unsafe fn flush() {}
 
+    #[inline(never)]
     unsafe fn release() {
         ENCODER.end_frame(uart_tx_write);
         let acquired = LOGGER_ACQUIRED.load(Ordering::Acquire);
@@ -49,6 +51,7 @@ unsafe impl defmt::Logger for Logger {
         critical_section::release(RESTORE_STATE);
     }
 
+    #[inline(never)]
     unsafe fn write(bytes: &[u8]) {
         ENCODER.write(bytes, uart_tx_write);
     }

@@ -17,7 +17,7 @@ use ch32_hal::otg_fs::{self};
 use ch32_hal::time::Hertz;
 use ch32_hal::usb::EndpointDataBuffer;
 use ch32_hal::usbhs::host::USBHsHostDriver;
-use ch32_hal::{self as hal, bind_interrupts, gpio, peripherals, rcc, usbhs};
+use ch32_hal::{self as hal, bind_interrupts, gpio, peripherals, rcc, usbhs, Peripherals};
 use ch32_hal::{
     mode::Blocking,
     peripherals::USART1,
@@ -39,6 +39,19 @@ bind_interrupts!(struct Irq {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     critical_section::with(|_| {
+        let uart1_config = usart::Config::default();
+        unsafe {
+            // SAFETY: PANICCCCCCCC
+            let p = Peripherals::steal();
+            LOGGER_UART = MaybeUninit::new(
+                UartTx::<'static, _, _>::new_blocking(p.USART1, p.PA9, uart1_config).unwrap(),
+            );
+        };
+        set_logger(&|data| unsafe {
+            #[allow(unused_must_use, static_mut_refs)]
+            LOGGER_UART.assume_init_mut().blocking_write(data);
+        });
+        let info = unsafe { core::ptr::read_volatile(&raw const info) };
         if let Some(location) = info.location() {
             println!(
                 "panic occurred in file '{}' at line {}",
@@ -48,6 +61,7 @@ fn panic(info: &PanicInfo) -> ! {
         } else {
             println!("panic occurred but can't get location information...");
         }
+        core::hint::black_box(info);
         loop {}
     })
 }
@@ -123,7 +137,6 @@ async fn main(_spawner: Spawner) -> ! {
 
     i2c.blocking_write(0x21, &[0x5, 0b00101011]).unwrap();
     i2c.blocking_write_read(0x21, &[0x5], &mut buf).unwrap();
-
     println!("0x21 0x5 reg: {:#b}", buf[0]);
 
     let sp: usize;

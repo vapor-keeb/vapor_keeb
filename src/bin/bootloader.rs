@@ -6,6 +6,7 @@ use core::{mem::MaybeUninit, panic::PanicInfo};
 use arrayvec::ArrayVec;
 use ch32_hal::i2c::I2c;
 use ch32_hal::otg_fs::{self};
+use ch32_hal::peripherals::I2C2;
 use ch32_hal::time::Hertz;
 use ch32_hal::usb::EndpointDataBuffer;
 use ch32_hal::{self as hal, bind_interrupts, peripherals, usbhs};
@@ -85,9 +86,33 @@ async fn programmer() {
         let data = DOWNLOAD_DATA_AVAILABLE.wait().await;
         info!(
             "Got data at \noffset={:x}, \ndata={:x}",
-            data.offset, data.buf
+            data.offset, &data.buf[..]
         );
         DOWNLOAD_COMPLETE.signal(());
+    }
+}
+
+#[embassy_executor::task(pool_size = 1)]
+async fn fusb(mut i2c: I2c<'static, I2C2, Blocking>) {
+    let mut buf = [0u8; 1];
+    unwrap!(i2c.blocking_write(0x31, &[0x5, 0b0111_1011]));
+    unwrap!(i2c.blocking_write_read(0x31, &[0x5], &mut buf));
+    println!("0x31 0x5 reg: {:#b}", buf[0]);
+    unwrap!(i2c.blocking_write_read(0x31, &[0x03], &mut buf));
+    println!("0x31 0x03 reg: {:#b}", buf[0]);
+    unwrap!(i2c.blocking_write(0x31, &[0x03, buf[0] | 0x2]));
+
+    unwrap!(i2c.blocking_write(0x21, &[0x5, 0b0111_1011]));
+    unwrap!(i2c.blocking_write_read(0x21, &[0x5], &mut buf));
+    println!("0x21 0x5 reg: {:#b}", buf[0]);
+    unwrap!(i2c.blocking_write_read(0x21, &[0x03], &mut buf));
+    println!("0x21 0x03 reg: {:#b}", buf[0]);
+    unwrap!(i2c.blocking_write(0x21, &[0x03, 0b0001_0010]));
+
+    loop {
+        unwrap!(i2c.blocking_write_read(0x21, &[0x13], &mut buf));
+        println!("0x21 0x13 reg: {:#b}", buf[0]);
+        Timer::after_millis(1000).await;
     }
 }
 
@@ -139,13 +164,13 @@ async fn main(spawner: Spawner) -> ! {
 
     spawner.spawn(programmer()).unwrap();
     // wait for serial-cat
-    Timer::after_millis(300).await;
+    // Timer::after_millis(300).await;
 
     // Setup I2C
     let i2c_sda = p.PB11;
     let i2c_scl = p.PB10;
 
-    let mut i2c = I2c::new_blocking(
+    let i2c = I2c::new_blocking(
         p.I2C2,
         i2c_scl,
         i2c_sda,
@@ -153,15 +178,7 @@ async fn main(spawner: Spawner) -> ! {
         Default::default(),
     );
 
-    let mut buf = [0u8; 1];
-    i2c.blocking_write(0x31, &[0x5, 0b00101011]).unwrap();
-    i2c.blocking_write_read(0x31, &[0x5], &mut buf).unwrap();
-    println!("0x31 0x5 reg: {:#b}", buf[0]);
-
-    i2c.blocking_write(0x21, &[0x5, 0b00101011]).unwrap();
-    i2c.blocking_write_read(0x21, &[0x5], &mut buf).unwrap();
-
-    println!("0x21 0x5 reg: {:#b}", buf[0]);
+    spawner.spawn(fusb(i2c)).unwrap();
 
     info!("Starting USB");
 
