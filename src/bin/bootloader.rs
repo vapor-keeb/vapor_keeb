@@ -11,13 +11,13 @@ use ch32_hal::time::Hertz;
 use ch32_hal::usb::EndpointDataBuffer;
 use ch32_hal::{self as hal, bind_interrupts, peripherals, usbhs};
 use ch32_hal::{
-    rcc,
     mode::Blocking,
     peripherals::USART1,
+    rcc,
     usart::{self, UartTx},
     Config,
 };
-use defmt::{unwrap, info, println, Display2Format};
+use defmt::{info, println, unwrap, Display2Format};
 use embassy_executor::Spawner;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::signal::Signal;
@@ -86,7 +86,8 @@ async fn programmer() {
         let data = DOWNLOAD_DATA_AVAILABLE.wait().await;
         info!(
             "Got data at \noffset={:x}, \ndata={:x}",
-            data.offset, &data.buf[..]
+            data.offset,
+            &data.buf[..]
         );
         DOWNLOAD_COMPLETE.signal(());
     }
@@ -187,7 +188,10 @@ async fn main(spawner: Spawner) -> ! {
     /* USB DRIVER SECION */
     let mut buffer: [EndpointDataBuffer; 1] =
         core::array::from_fn(|_| EndpointDataBuffer::default());
+    // usbhs
     let driver = usbhs::Driver::new(p.USBHS, Irq, p.PB7, p.PB6, &mut buffer);
+    // usbfs
+    // let driver = otg_fs::Driver::new(p.OTG_FS, p.PA11, p.PA12, &mut buffer);
 
     // Create embassy-usb Config
     let mut config = embassy_usb::Config::new(0x6666, 0xcafe);
