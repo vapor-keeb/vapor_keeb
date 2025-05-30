@@ -13,6 +13,10 @@ pub fn set_logger(write: &'static dyn Fn(&[u8])) {
     unsafe { WRITER = Some(write) }
 }
 
+pub unsafe fn has_logger() -> bool {
+    WRITER.is_some()
+}
+
 fn uart_tx_write(bytes: &[u8]) {
     unsafe { WRITER.map(|write| write(bytes)) };
 }

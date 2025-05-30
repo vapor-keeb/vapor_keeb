@@ -39,18 +39,20 @@ bind_interrupts!(struct Irq {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     critical_section::with(|_| {
-        let uart1_config = usart::Config::default();
-        unsafe {
-            // SAFETY: PANICCCCCCCC
-            let p = Peripherals::steal();
-            LOGGER_UART = MaybeUninit::new(
-                UartTx::<'static, _, _>::new_blocking(p.USART1, p.PA9, uart1_config).unwrap(),
-            );
-        };
-        set_logger(&|data| unsafe {
-            #[allow(unused_must_use, static_mut_refs)]
-            LOGGER_UART.assume_init_mut().blocking_write(data);
-        });
+        if unsafe { !vapor_keeb::logger::has_logger() } {
+            let uart1_config = usart::Config::default();
+            unsafe {
+                // SAFETY: PANICCCCCCCC
+                let p = Peripherals::steal();
+                LOGGER_UART = MaybeUninit::new(
+                    UartTx::<'static, _, _>::new_blocking(p.USART1, p.PA9, uart1_config).unwrap(),
+                );
+            };
+            set_logger(&|data| unsafe {
+                #[allow(unused_must_use, static_mut_refs)]
+                LOGGER_UART.assume_init_mut().blocking_write(data);
+            });
+        }
         let info = unsafe { core::ptr::read_volatile(&raw const info) };
         if let Some(location) = info.location() {
             println!(
@@ -61,7 +63,6 @@ fn panic(info: &PanicInfo) -> ! {
         } else {
             println!("panic occurred but can't get location information...");
         }
-        core::hint::black_box(info);
         loop {}
     })
 }
