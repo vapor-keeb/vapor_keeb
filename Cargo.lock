@@ -31,6 +31,7 @@ dependencies = [
  "embassy-sync",
  "embassy-time",
  "static_assertions",
+ "usb-dfu-target",
 ]
 
 [[package]]
