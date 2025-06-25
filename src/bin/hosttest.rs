@@ -6,6 +6,7 @@ use core::pin::{pin, Pin};
 use core::task::{Context, Poll};
 use core::{mem::MaybeUninit, panic::PanicInfo};
 
+use async_usb_host::driver::dfu::{DFUOperation, UsbDfu};
 use async_usb_host::driver::kbd::HidKbd;
 use async_usb_host::errors::UsbHostError;
 use async_usb_host::futures::SelectPin2;
@@ -27,14 +28,24 @@ use ch32_hal::{
 use defmt::error;
 use defmt::{info, println};
 use embassy_executor::Spawner;
-use embassy_futures::select::{select, Either};
+use embassy_futures::select::Either;
 use embassy_time::Timer;
-use vapor_keeb::logger::{self, set_logger};
+use vapor_keeb::logger::set_logger;
 
 bind_interrupts!(struct Irq {
     OTG_FS => otg_fs::InterruptHandler<peripherals::OTG_FS>;
     USBHS => usbhs::host::InterruptHandler<peripherals::USBHS>;
 });
+
+#[embassy_executor::task]
+async fn test_dfu() {
+    let dfu_channel = UsbDfu::channel_sender();
+    dfu_channel.send(DFUOperation::StartDownload).await;
+    dfu_channel.send(DFUOperation::Bytes([0; 8])).await;
+    info!("Sent bytes");
+    dfu_channel.send(DFUOperation::Manifest).await;
+    dfu_channel.send(DFUOperation::Detach).await;
+}
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -156,7 +167,7 @@ async fn main(_spawner: Spawner) -> ! {
 
     // Create our host driver with support for multiple devices
     let mut host_dispatcher =
-        async_usb_host::driver::USBDeviceDispatcher::<HidKbd, _, NR_DEVICES>::new(&pipe);
+        async_usb_host::driver::USBDeviceDispatcher::<UsbDfu, _, NR_DEVICES>::new(&pipe);
     let mut host = Host::<'_, _, 4, NR_DEVICES>::new(bus, &pipe);
 
     // Create the futures for host_driver and host
@@ -165,6 +176,8 @@ async fn main(_spawner: Spawner) -> ! {
 
     // Create and pin the SelectPin2 instance
     let mut select = pin!(SelectPin2::with_futures(host_dispatcher_fut, host_fut));
+
+    _spawner.must_spawn(test_dfu());
 
     loop {
         match select.as_mut().await {

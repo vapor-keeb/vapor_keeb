@@ -10,3 +10,6 @@
 [submodule "async-usb-host"]
 	path = async-usb-host
 	url = git@github.com:vapor-keeb/async-usb-host.git
+[submodule "embassy"]
+	path = embassy
+	url = git@github.com:vapor-keeb/embassy.git
