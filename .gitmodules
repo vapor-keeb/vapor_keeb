@@ -13,3 +13,6 @@
 [submodule "embassy"]
 	path = embassy
 	url = git@github.com:vapor-keeb/embassy.git
+[submodule "rmk"]
+	path = rmk
+	url = git@github.com:HaoboGu/rmk.git
